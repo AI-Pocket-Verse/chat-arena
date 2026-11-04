@@ -9,6 +9,7 @@ chat-arena talks to the chat backend under test through three HTTP endpoints: mi
 - **Base URL**: you configure a prefix such as `https://example.com/companion`; endpoints are appended to it, e.g. `https://example.com/companion/debug/token`.
 - **Extra headers**: the JSON object in `TARGET_HEADERS` is added to every request (for client-version headers and the like).
 - **Response envelope**: every response except the `/chat` stream is `{"code": 200, "msg": "ok", "data": {...}}`. Business errors (wrong key, expired token, ...) may use HTTP 200 with a non-200 `code`; chat-arena checks `code` and shows `msg` as the error reason. On error, `/chat` may return a JSON envelope (`Content-Type: application/json`) instead of an event stream.
+- **Language**: requests carry `Accept-Language` (`zh-CN` or `en`): the UI language for the roles list and connection test, and the evaluation's language for its token and chat requests. A backend that supports several languages can return role profiles and replies in that language; others can ignore it. An `Accept-Language` in `TARGET_HEADERS` takes precedence.
 - **Auth**: `/debug/*` endpoints use the `X-Debug-Key` header (the value of `TARGET_DEBUG_KEY`). `/chat` uses the `Authorization` header, whose value is the raw token returned by `/debug/token` -- no `Bearer` prefix.
 - Fields chat-arena does not use are ignored, so a backend may return or accept more than described here.
 

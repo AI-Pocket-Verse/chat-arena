@@ -3,7 +3,7 @@ import type { TargetChatResult, Dialogue, Persona, RecallProbe } from '../types'
 import { shouldEnd, type EndCondition, type EndReason } from './end-condition'
 import type { JudgeEngine, JudgeResult } from './judge-engine'
 import type { LiveEvent } from './live-events'
-import type { PersonaEngine } from './persona-engine'
+import type { DirectorCue, PersonaEngine } from './persona-engine'
 
 export interface SessionMeta {
   targetUid?: number
@@ -188,7 +188,7 @@ export async function runSession(deps: SessionRunnerDeps, input: RunSessionInput
     })
     if (endReason) return finish(endReason)
 
-    // inject fact or probe as extraInstruction (non-replay only).
+    // inject fact or probe as a director cue (non-replay only).
     // Bug 5a fix: injectAtTurn / probeAtTurn are 1-based turn numbers;
     // idx is 0-based, so match with idx + 1.
     const injectFact = input.persona.injectedFacts?.find(f => f.injectAtTurn === idx + 1)
@@ -209,15 +209,15 @@ export async function runSession(deps: SessionRunnerDeps, input: RunSessionInput
         return finish('max_turns')
       }
     } else {
-      const extraInstruction = injectFact
-        ? `自然地提到：${injectFact.key}是${injectFact.value}`
+      const cue: DirectorCue | undefined = injectFact
+        ? { kind: 'inject', key: injectFact.key, value: injectFact.value }
         : probeFact
-          ? `自然地问对方：${probeFact.question}`
+          ? { kind: 'probe', question: probeFact.question }
           : undefined
-      userText = await deps.persona.nextUserMessage(input.persona, history, extraInstruction)
+      userText = await deps.persona.nextUserMessage(input.persona, history, cue)
       // 模拟用户模型偶尔返回空串（如推理类模型 content 为 null）：重试一次，仍为空则让会话失败，
       // 不能把空消息发给被测后端，否则责任会算到被测方头上。
-      if (userText.trim() === '') userText = await deps.persona.nextUserMessage(input.persona, history, extraInstruction)
+      if (userText.trim() === '') userText = await deps.persona.nextUserMessage(input.persona, history, cue)
       if (userText.trim() === '') throw new Error('模拟用户模型连续两次返回空消息')
     }
 

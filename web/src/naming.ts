@@ -1,6 +1,5 @@
 // Run 名称 / 版本标注的允许字符：英文字母、数字，以及常用特殊字符 - _ . 。其余不支持。
 export const NAME_ALLOWED_RE = /^[A-Za-z0-9._-]*$/
-export const NAME_ALLOWED_HINT = '只支持英文字母、数字和 - _ . ，其它字符不支持'
 
 // pinyin-pro 自带较大的汉字词典——按需懒加载，避免进主包。
 // 首次需要时动态 import；加载完成前 toSlug 对中文返回空串，调用方应在

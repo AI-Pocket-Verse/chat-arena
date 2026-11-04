@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify'
+import { pick, reqLang } from './i18n'
 
 /** 启用登录后仍可匿名访问的路由（按注册时的路由模式匹配） */
 const PUBLIC_ROUTES = new Set(['/api/ping', '/healthz', '/readyz'])
@@ -18,7 +19,7 @@ export function registerAuthGate(app: FastifyInstance, opts: { authRequired: boo
     if (route && PUBLIC_ROUTES.has(route)) return
     if (!req.user) {
       // 登录服务超时 / 5xx：不是「未登录」，返回可重试的 503，避免前端把用户踢去登录页
-      if (req.authTransient) return reply.code(503).send({ error: 'auth_unavailable', message: '登录服务暂时不可用，请稍后重试' })
+      if (req.authTransient) return reply.code(503).send({ error: 'auth_unavailable', message: pick(reqLang(req), { zh: '登录服务暂时不可用，请稍后重试', en: 'The sign-in service is temporarily unavailable. Please try again later.' }) })
       return reply.code(401).send({ error: 'Unauthorized' })
     }
   })
@@ -50,7 +51,10 @@ function registerLocalHostGuard(app: FastifyInstance, extraHosts: string[]): voi
     if (host && allowed.has(host) && (originHost === undefined || (originHost && allowed.has(originHost)))) return
     return reply.code(403).send({
       error: 'host_not_allowed',
-      message: '本地模式只接受来自本机的访问。通过其他域名或 IP 访问时，请把它加入 ALLOWED_HOSTS，或启用登录（WHOAMI_URL）',
+      message: pick(reqLang(req), {
+        zh: '本地模式只接受来自本机的访问。通过其他域名或 IP 访问时，请把它加入 ALLOWED_HOSTS，或启用登录（WHOAMI_URL）',
+        en: 'Local mode only accepts requests from this machine. To use another domain or IP, add it to ALLOWED_HOSTS, or enable sign-in (WHOAMI_URL).',
+      }),
     })
   })
 }

@@ -1,10 +1,12 @@
 import type { RunConfig } from '@chat-arena/shared'
 import { createHttpClient } from '@chat-arena/http-client'
+import { currentLang } from './i18n/lang'
 
 // API prefix = vite base + "api"（默认部署在根路径时为 /api）。
 // 本地开发由 vite 代理到 :4040，生产由 nginx 反代（见 deploy/）。
 const API_BASE = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '') + '/api'
-const http = createHttpClient({ baseUrl: window.location.origin })
+// X-Lang：当前界面语言。api 据此返回对应语言的错误提示，发起评测时记下语言，AI 生成的内容（点评、报告等）跟随它
+const http = createHttpClient({ baseUrl: window.location.origin, getHeaders: () => ({ 'X-Lang': currentLang() }) })
 
 export interface RunAggregate {
   turnCount: number

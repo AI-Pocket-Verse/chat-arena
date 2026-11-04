@@ -1,0 +1,116 @@
+// 公共区域（外壳、导航、通用按钮、错误提示）的界面文案。key 以 `app.` `nav.` `lang.` `common.` `error.` 开头。
+// 中文是原有文案（与改造前逐字一致），英文逐条对应。en 的类型保证漏翻一条会直接编译失败。
+
+export const zh = {
+  'app.title': '模拟评测',
+  'app.loading': '加载中…',
+  'app.redirectingToLogin': '跳转登录中…',
+
+  'nav.group.eval': '评测',
+  'nav.group.analysis': '分析',
+  'nav.group.library': '素材库',
+  'nav.config': '新建评测',
+  'nav.observe': '实时评测',
+  'nav.history': '评测记录',
+  'nav.dashboard': '数据看板',
+  'nav.compare': '版本对比',
+  'nav.reports': '评测报告',
+  'nav.personas': '用户人设库',
+  'nav.roles': 'AI 角色库',
+  'nav.dot.running': '运行中',
+  'nav.dot.reportGenerating': '报告生成中',
+
+  'identity.copyTitle': '点击复制 {label}:{value}',
+  'identity.copied': '已复制',
+  'identity.copy': '复制',
+
+  'lang.switch': '界面语言',
+  'lang.system': '跟随系统',
+  'lang.zh': '中文',
+  'lang.en': 'English',
+
+  'menu.settings': '设置',
+  'menu.logout': '退出登录',
+  'menu.login': '登录',
+
+  'common.confirm': '确定',
+  'common.cancel': '取消',
+  'common.processing': '处理中…',
+  'common.retry': '重试',
+  'common.creator': '创建者：{label}',
+  'common.localUser': '本地用户',
+
+  'naming.allowedHint': '只支持英文字母、数字和 - _ . ，其它字符不支持',
+
+  'error.loadFailed': '加载失败',
+  'error.unavailable': '服务暂时不可用，请稍后重试（后端可能正在重启，或上游/依赖服务无响应）。',
+  'error.server': '服务器内部错误，请稍后重试。',
+  'error.unauthorized': '未登录或登录已过期，请重新登录。',
+  'error.forbidden': '没有访问权限。',
+  'error.notFound': '请求的资源不存在。',
+  'error.tooMany': '请求过于频繁，请稍后再试。',
+  'error.badRequest': '请求有误，请检查参数后重试。',
+  'error.requestFailed': '请求失败。',
+  'error.network': '网络连接失败，请检查网络，或确认后端服务是否已启动。',
+  'error.showDetails': '查看详细信息',
+  'error.hideDetails': '收起详细信息',
+  'error.pageCrashed': '页面出错了',
+  'error.pageCrashedHint': '可以点「重试」恢复；反复出现的话，请带上下面这行信息反馈。',
+} satisfies Record<string, string>
+
+export const en: Record<keyof typeof zh, string> = {
+  'app.title': 'Chat Arena',
+  'app.loading': 'Loading…',
+  'app.redirectingToLogin': 'Redirecting to sign-in…',
+
+  'nav.group.eval': 'Evaluate',
+  'nav.group.analysis': 'Analyze',
+  'nav.group.library': 'Library',
+  'nav.config': 'New evaluation',
+  'nav.observe': 'Live evaluation',
+  'nav.history': 'Runs',
+  'nav.dashboard': 'Dashboard',
+  'nav.compare': 'Compare',
+  'nav.reports': 'Reports',
+  'nav.personas': 'Personas',
+  'nav.roles': 'AI roles',
+  'nav.dot.running': 'Running',
+  'nav.dot.reportGenerating': 'Generating report',
+
+  'identity.copyTitle': 'Click to copy {label}: {value}',
+  'identity.copied': 'Copied',
+  'identity.copy': 'Copy',
+
+  'lang.switch': 'Language',
+  'lang.system': 'System',
+  'lang.zh': '中文',
+  'lang.en': 'English',
+
+  'menu.settings': 'Settings',
+  'menu.logout': 'Sign out',
+  'menu.login': 'Sign in',
+
+  'common.confirm': 'OK',
+  'common.cancel': 'Cancel',
+  'common.processing': 'Working…',
+  'common.retry': 'Retry',
+  'common.creator': 'Created by {label}',
+  'common.localUser': 'Local user',
+
+  'naming.allowedHint': 'Only letters, digits and - _ . are allowed',
+
+  'error.loadFailed': 'Failed to load',
+  'error.unavailable': 'The service is temporarily unavailable. Please try again later (the api may be restarting, or an upstream service is not responding).',
+  'error.server': 'Internal server error. Please try again later.',
+  'error.unauthorized': 'You are not signed in or your session has expired. Please sign in again.',
+  'error.forbidden': 'You do not have access.',
+  'error.notFound': 'The requested resource does not exist.',
+  'error.tooMany': 'Too many requests. Please try again later.',
+  'error.badRequest': 'Invalid request. Please check the input and try again.',
+  'error.requestFailed': 'Request failed.',
+  'error.network': 'Network error. Check your connection, or make sure the api is running.',
+  'error.showDetails': 'Show details',
+  'error.hideDetails': 'Hide details',
+  'error.pageCrashed': 'Something went wrong',
+  'error.pageCrashedHint': 'Click "Retry" to recover. If it keeps happening, please report it with the line below.',
+}

@@ -1,3 +1,6 @@
+import { pick } from '../i18n'
+import type { Lang } from '../i18n'
+
 export interface TurnForReport {
   idx: number
   sessionId: string
@@ -25,12 +28,18 @@ export const DIM_NAMES: Record<string, string> = {
   personaFit: '人设贴合', empathy: '情感共情', memoryAccuracy: '记忆准确',
   safety: '安全合规', naturalness: '自然流畅', relevance: '相关性',
 }
+const DIM_NAMES_EN: Record<string, string> = {
+  personaFit: 'Persona fit', empathy: 'Empathy', memoryAccuracy: 'Memory accuracy',
+  safety: 'Safety', naturalness: 'Naturalness', relevance: 'Relevance',
+}
+/** 按语言取维度名；zh 与 DIM_NAMES 相同 */
+export const dimNamesFor = (lang: Lang = 'zh'): Record<string, string> => (lang === 'en' ? DIM_NAMES_EN : DIM_NAMES)
 
 // 跨会话可读标签：人设名 · 重复#k · 第n轮（解决多会话 idx 撞号、无法溯源的问题）
-export function turnLabel(t: TurnForReport): string {
-  const persona = t.personaName?.trim() || '会话'
-  const rep = typeof t.repetitionIndex === 'number' ? ` · 重复#${t.repetitionIndex + 1}` : ''
-  return `${persona}${rep} · 第 ${t.idx + 1} 轮`
+export function turnLabel(t: TurnForReport, lang: Lang = 'zh'): string {
+  const persona = t.personaName?.trim() || pick(lang, { zh: '会话', en: 'Session' })
+  const rep = typeof t.repetitionIndex === 'number' ? pick(lang, { zh: ` · 重复#${t.repetitionIndex + 1}`, en: ` · Repetition #${t.repetitionIndex + 1}` }) : ''
+  return pick(lang, { zh: `${persona}${rep} · 第 ${t.idx + 1} 轮`, en: `${persona}${rep} · Turn ${t.idx + 1}` })
 }
 
 // 稳定排序键：先按会话再按 idx，保证同分时样本可复现。
@@ -93,7 +102,7 @@ export function clusterSuggestions(turns: TurnForReport[]): SuggestionCluster[] 
   for (const t of turns) {
     if (t.judgeError) continue
     const s = t.improvementSuggestion.trim()
-    if (!s || s === '保持') continue
+    if (!s || s === '保持' || /^(keep|keep as is)[.!]?$/i.test(s)) continue
     const existing = map.get(s)
     if (existing) existing.push(t.idx)
     else map.set(s, [t.idx])
@@ -150,6 +159,7 @@ export interface SynthesisSample {
   overall: number; dims: Record<string, number>; comment: string; suggestion: string; violation: boolean
 }
 export interface SynthesisInput {
+  lang?: Lang
   stats: {
     totalTurns: number
     scoredTurns: number
@@ -171,6 +181,7 @@ export interface SynthesisInput {
 export interface ReportDimension { key: string; name: string; score: number | null; assessment: string; suggestion: string }
 
 export interface ReportInput {
+  lang?: Lang
   runId: string
   totalSessions: number
   totalTurns: number
@@ -197,26 +208,30 @@ export interface ReportInput {
 }
 
 const fmt1 = (v: number | null | undefined) => (typeof v === 'number' && Number.isFinite(v) ? v.toFixed(1) : '—')
-const cell = (s: string) => (s || '—').replace(/\n/g, ' ').replace(/\|/g, '｜')
+const cell = (s: string, lang: Lang = 'zh') => (s || '—').replace(/\n/g, ' ').replace(/\|/g, lang === 'en' ? '\\|' : '｜')
 
-function turnBlock(t: TurnForReport): string {
+function turnBlock(t: TurnForReport, lang: Lang): string {
+  const names = dimNamesFor(lang)
   const dimsText = DIM_KEYS
-    .map(k => (typeof t.dims[k] === 'number' ? `${DIM_NAMES[k]} ${t.dims[k]}` : null))
+    .map(k => (typeof t.dims[k] === 'number' ? `${names[k]} ${t.dims[k]}` : null))
     .filter(Boolean)
     .join(' · ')
   return [
-    `### ${turnLabel(t)} — 综合分 ${t.overall.toFixed(1)} / 10`,
-    dimsText ? `**各维度：** ${dimsText}` : '',
-    `**用户：** ${t.userText}`,
-    `**被测 AI：** ${t.targetText}`,
-    t.comment ? `**点评：** ${t.comment}` : '',
-    t.improvementSuggestion ? `**改进建议：** ${t.improvementSuggestion}` : '',
-    t.violation ? `**⚠️ 违规**` : '',
+    pick(lang, { zh: `### ${turnLabel(t, lang)} — 综合分 ${t.overall.toFixed(1)} / 10`, en: `### ${turnLabel(t, lang)} — Overall ${t.overall.toFixed(1)} / 10` }),
+    dimsText ? pick(lang, { zh: `**各维度：** ${dimsText}`, en: `**Dimensions:** ${dimsText}` }) : '',
+    pick(lang, { zh: `**用户：** ${t.userText}`, en: `**User:** ${t.userText}` }),
+    pick(lang, { zh: `**被测 AI：** ${t.targetText}`, en: `**AI under test:** ${t.targetText}` }),
+    t.comment ? pick(lang, { zh: `**点评：** ${t.comment}`, en: `**Comment:** ${t.comment}` }) : '',
+    t.improvementSuggestion ? pick(lang, { zh: `**改进建议：** ${t.improvementSuggestion}`, en: `**Suggestion:** ${t.improvementSuggestion}` }) : '',
+    t.violation ? pick(lang, { zh: `**⚠️ 违规**`, en: `**⚠️ Violation**` }) : '',
     ``,
   ].filter(Boolean).join('\n')
 }
 
 export function buildReportMarkdown(input: ReportInput): string {
+  const lang: Lang = input.lang ?? 'zh'
+  const L = (zh: string, en: string) => pick(lang, { zh, en })
+  const none = L('（无）', '(none)')
   const dims = input.dimensions ?? []
   const strengths = input.strengths ?? []
   const weaknesses = input.weaknesses ?? []
@@ -225,55 +240,61 @@ export function buildReportMarkdown(input: ReportInput): string {
   const dist = input.distribution ?? { excellent: 0, good: 0, fair: 0, weak: 0 }
 
   const lines: string[] = [
-    `# 评测报告`,
+    L(`# 评测报告`, `# Evaluation report`),
     ``,
     `**Run ID:** ${input.runId}`,
-    `**会话数:** ${input.totalSessions} | **总轮数:** ${input.totalTurns} | **有效评分:** ${input.scoredTurns}` +
+    L(`**会话数:** ${input.totalSessions} | **总轮数:** ${input.totalTurns} | **有效评分:** ${input.scoredTurns}` +
       (input.judgeFailedCount > 0 ? ` | **裁判失败:** ${input.judgeFailedCount}` : ''),
-    `**平均综合分:** ${input.avgOverall != null ? `${input.avgOverall.toFixed(2)} / 10` : '—'} | **违规数:** ${input.violations}`,
-    input.memoryHitRate != null ? `**记忆命中率:** ${(input.memoryHitRate * 100).toFixed(0)}% | **记忆未命中:** ${input.memoryMisses} 次` : '',
+      `**Sessions:** ${input.totalSessions} | **Total turns:** ${input.totalTurns} | **Scored turns:** ${input.scoredTurns}` +
+      (input.judgeFailedCount > 0 ? ` | **Judge failures:** ${input.judgeFailedCount}` : '')),
+    L(`**平均综合分:** ${input.avgOverall != null ? `${input.avgOverall.toFixed(2)} / 10` : '—'} | **违规数:** ${input.violations}`,
+      `**Average overall score:** ${input.avgOverall != null ? `${input.avgOverall.toFixed(2)} / 10` : '—'} | **Violations:** ${input.violations}`),
+    input.memoryHitRate != null
+      ? L(`**记忆命中率:** ${(input.memoryHitRate * 100).toFixed(0)}% | **记忆未命中:** ${input.memoryMisses} 次`,
+          `**Memory hit rate:** ${(input.memoryHitRate * 100).toFixed(0)}% | **Memory misses:** ${input.memoryMisses}`)
+      : '',
     ``,
-    `## 总体评价`,
+    L(`## 总体评价`, `## Overall assessment`),
     ``,
-    input.overallAssessment?.trim() || '（无）',
+    input.overallAssessment?.trim() || none,
     ``,
-    `## 各维度评估`,
+    L(`## 各维度评估`, `## Dimension assessment`),
     ``,
-    `| 维度 | 均分 | 评价 | 建议 |`,
+    L(`| 维度 | 均分 | 评价 | 建议 |`, `| Dimension | Avg | Assessment | Suggestion |`),
     `| --- | --- | --- | --- |`,
-    ...dims.map(d => `| ${d.name} | ${fmt1(d.score)} | ${cell(d.assessment)} | ${cell(d.suggestion)} |`),
+    ...dims.map(d => `| ${d.name} | ${fmt1(d.score)} | ${cell(d.assessment, lang)} | ${cell(d.suggestion, lang)} |`),
     ``,
-    `## 评分分布（有效评分 ${input.scoredTurns} 轮）`,
+    L(`## 评分分布（有效评分 ${input.scoredTurns} 轮）`, `## Score distribution (${input.scoredTurns} scored turns)`),
     ``,
-    `- 优秀 (≥8)：${dist.excellent} 轮`,
-    `- 良好 [6,8)：${dist.good} 轮`,
-    `- 一般 [4,6)：${dist.fair} 轮`,
-    `- 偏弱 (<4)：${dist.weak} 轮`,
+    L(`- 优秀 (≥8)：${dist.excellent} 轮`, `- Excellent (≥8): ${dist.excellent} turns`),
+    L(`- 良好 [6,8)：${dist.good} 轮`, `- Good [6,8): ${dist.good} turns`),
+    L(`- 一般 [4,6)：${dist.fair} 轮`, `- Fair [4,6): ${dist.fair} turns`),
+    L(`- 偏弱 (<4)：${dist.weak} 轮`, `- Weak (<4): ${dist.weak} turns`),
     ``,
-    `## 亮点`,
+    L(`## 亮点`, `## Strengths`),
     ``,
-    strengths.length ? strengths.map(s => `- ${s}`).join('\n') : '（无）',
+    strengths.length ? strengths.map(s => `- ${s}`).join('\n') : none,
     ``,
-    `## 主要问题`,
+    L(`## 主要问题`, `## Main issues`),
     ``,
-    weaknesses.length ? weaknesses.map(s => `- ${s}`).join('\n') : '（无）',
+    weaknesses.length ? weaknesses.map(s => `- ${s}`).join('\n') : none,
     ``,
-    `## 优先改进清单`,
+    L(`## 优先改进清单`, `## Prioritized actions`),
     ``,
-    actions.length ? actions.map((s, i) => `${i + 1}. ${s}`).join('\n') : '（无）',
+    actions.length ? actions.map((s, i) => `${i + 1}. ${s}`).join('\n') : none,
     ``,
-    `## 角色 Prompt 修订建议`,
+    L(`## 角色 Prompt 修订建议`, `## Character prompt revision suggestions`),
     ``,
-    input.promptChanges?.trim() ? input.promptChanges.trim() : '（无文字摘要）',
+    input.promptChanges?.trim() ? input.promptChanges.trim() : L('（无文字摘要）', '(no text summary)'),
     ``,
     ...(input.originalPrompt
-      ? ['**原始角色 Prompt：**', '', '```', input.originalPrompt, '```', '', '**修订版：**', '', '```', input.revisedPrompt || '（未生成）', '```', '']
+      ? [L('**原始角色 Prompt：**', '**Original character prompt:**'), '', '```', input.originalPrompt, '```', '', L('**修订版：**', '**Revised version:**'), '', '```', input.revisedPrompt || L('（未生成）', '(not generated)'), '```', '']
       : []),
-    `## 记忆系统问题`,
+    L(`## 记忆系统问题`, `## Memory issues`),
     ``,
-    input.memoryIssues?.trim() || '无',
+    input.memoryIssues?.trim() || L('无', 'None'),
     ``,
-    `## 安全与边界`,
+    L(`## 安全与边界`, `## Safety and boundaries`),
     ``,
     // TODO: 被测后端返回的 safetyMode 属于硬指标之一。
     // TargetMeta.safetyMode is stored in turn.rawMetaJson by session-runner, but
@@ -284,22 +305,23 @@ export function buildReportMarkdown(input: ReportInput): string {
     //   (b) accept a pre-aggregated safetyModeCount from the caller.
     // Until that data path is wired, this section relies solely on the LLM-synthesized
     // safetyIssues string and the programmatic violation flag (which is separate from safetyMode).
-    input.safetyIssues?.trim() || '无',
+    input.safetyIssues?.trim() || L('无', 'None'),
     ``,
-    `### 违规清单（${violations.length}）`,
+    L(`### 违规清单（${violations.length}）`, `### Violations (${violations.length})`),
     ``,
-    ...(violations.length ? violations.map(turnBlock) : ['（无违规）', '']),
-    `## 低分回放（Top ${input.worstTurns.length}）`,
+    ...(violations.length ? violations.map(t => turnBlock(t, lang)) : [L('（无违规）', '(no violations)'), '']),
+    L(`## 低分回放（Top ${input.worstTurns.length}）`, `## Lowest-scored turns (Top ${input.worstTurns.length})`),
     ``,
-    ...input.worstTurns.map(turnBlock),
-    `## 高分样例（Top ${input.bestTurns.length}）`,
+    ...input.worstTurns.map(t => turnBlock(t, lang)),
+    L(`## 高分样例（Top ${input.bestTurns.length}）`, `## Highest-scored turns (Top ${input.bestTurns.length})`),
     ``,
-    ...input.bestTurns.map(turnBlock),
+    ...input.bestTurns.map(t => turnBlock(t, lang)),
   ].filter(s => s !== undefined)
   return lines.join('\n')
 }
 
 export interface GenerateReportDeps {
+  lang?: Lang
   runId: string
   sessions: Array<{
     id: string
@@ -330,8 +352,8 @@ export interface GenerateReportDeps {
   synthesizeSuggestions?: (input: SynthesisInput) => Promise<SynthesisResult>
 }
 
-const toSample = (t: TurnForReport): SynthesisSample => ({
-  idx: t.idx, sessionLabel: turnLabel(t), userText: t.userText, targetText: t.targetText,
+const toSample = (t: TurnForReport, lang: Lang): SynthesisSample => ({
+  idx: t.idx, sessionLabel: turnLabel(t, lang), userText: t.userText, targetText: t.targetText,
   overall: t.overall, dims: t.dims, comment: t.comment, suggestion: t.improvementSuggestion, violation: t.violation,
 })
 
@@ -339,6 +361,8 @@ const MAX_SUGGESTIONS = 30
 const MAX_SUGGESTION_LEN = 200
 
 export async function generateReport(deps: GenerateReportDeps): Promise<{ markdown: string; json: string }> {
+  const lang: Lang = deps.lang ?? 'zh'
+  const dimNames = dimNamesFor(lang)
   const allTurns: TurnForReport[] = []
   // 会话按创建时间排序，轮按 idx 排序，保证拼接序列稳定可读。
   const sessions = [...deps.sessions].sort((a, b) => String(a.createdAt ?? '').localeCompare(String(b.createdAt ?? '')))
@@ -379,12 +403,13 @@ export async function generateReport(deps: GenerateReportDeps): Promise<{ markdo
   const rawSuggestions = clusters.slice(0, MAX_SUGGESTIONS).map(c => c.suggestion.slice(0, MAX_SUGGESTION_LEN))
 
   const synthInput: SynthesisInput = {
+    lang,
     stats: { totalTurns: allTurns.length, scoredTurns, avgOverall: deps.avgOverall, violations: deps.violations, memoryHitRate: deps.memoryHitRate, memoryMisses, dimMeans },
-    dimNames: DIM_NAMES,
+    dimNames,
     distribution,
-    worstSamples: worst.map(toSample),
-    bestSamples: best.map(toSample),
-    violationSamples: violationTurns.slice(0, 8).map(toSample),
+    worstSamples: worst.map(t => toSample(t, lang)),
+    bestSamples: best.map(t => toSample(t, lang)),
+    violationSamples: violationTurns.slice(0, 8).map(t => toSample(t, lang)),
     suggestions: rawSuggestions,
     originalPrompt: deps.originalPrompt ?? null,
   }
@@ -405,10 +430,11 @@ export async function generateReport(deps: GenerateReportDeps): Promise<{ markdo
   const llmDims = new Map((synthesis.dimensions ?? []).map(d => [d.key, d]))
   const dimensions: ReportDimension[] = DIM_KEYS.map(key => {
     const d = llmDims.get(key)
-    return { key, name: DIM_NAMES[key]!, score: dimMeans[key] ?? null, assessment: d?.assessment ?? '', suggestion: d?.suggestion ?? '' }
+    return { key, name: dimNames[key]!, score: dimMeans[key] ?? null, assessment: d?.assessment ?? '', suggestion: d?.suggestion ?? '' }
   })
 
   const reportInput: ReportInput = {
+    ...(lang === 'en' ? { lang } : {}),
     runId: deps.runId,
     totalSessions: deps.totalSessions,
     totalTurns: allTurns.length,
@@ -455,35 +481,39 @@ function buildFallbackSynthesis(input: SynthesisInput, violationTurns: TurnForRe
   const top = sorted.slice(0, 2)
   const bottom = [...sorted].reverse().slice(0, 2)
 
-  const band = input.stats.avgOverall == null ? '暂无有效评分'
-    : input.stats.avgOverall >= 8 ? '整体表现优秀'
-    : input.stats.avgOverall >= 6 ? '整体表现良好，仍有提升空间'
-    : input.stats.avgOverall >= 4 ? '整体表现一般，问题较多'
-    : '整体表现偏弱，需重点优化'
+  const lang: Lang = input.lang ?? 'zh'
+  const L = (zh: string, en: string) => pick(lang, { zh, en })
+  const band = input.stats.avgOverall == null ? L('暂无有效评分', 'No valid scores yet')
+    : input.stats.avgOverall >= 8 ? L('整体表现优秀', 'Overall performance is excellent')
+    : input.stats.avgOverall >= 6 ? L('整体表现良好，仍有提升空间', 'Overall performance is good, with room for improvement')
+    : input.stats.avgOverall >= 4 ? L('整体表现一般，问题较多', 'Overall performance is fair, with many issues')
+    : L('整体表现偏弱，需重点优化', 'Overall performance is weak and needs focused optimization')
 
   // 安全问题确定性地列出所有违规轮（不依赖 LLM）。
   const safety = violationTurns.length > 0
-    ? `共 ${violationTurns.length} 次违规：\n` + violationTurns.slice(0, 10).map(t => `- ${turnLabel(t)}：用户「${t.userText}」→ 被测 AI「${t.targetText}」`).join('\n')
-    : '无'
+    ? L(`共 ${violationTurns.length} 次违规：\n`, `${violationTurns.length} violation(s):\n`) + violationTurns.slice(0, 10).map(t => L(`- ${turnLabel(t, lang)}：用户「${t.userText}」→ 被测 AI「${t.targetText}」`, `- ${turnLabel(t, lang)}: user "${t.userText}" -> AI under test "${t.targetText}"`)).join('\n')
+    : L('无', 'None')
 
   const why = reason
-    ? `（LLM 综合分析调用失败：${reason.slice(0, 140)}；以下为基于统计的兜底结论，请重新生成或检查模型配置。）`
-    : `（未配置 LLM 综合分析；以下为基于统计的兜底结论。）`
+    ? L(`（LLM 综合分析调用失败：${reason.slice(0, 140)}；以下为基于统计的兜底结论，请重新生成或检查模型配置。）`,
+        `(LLM synthesis failed: ${reason.slice(0, 140)}. The conclusions below are a statistical fallback; regenerate the report or check the model configuration.)`)
+    : L(`（未配置 LLM 综合分析；以下为基于统计的兜底结论。）`, `(LLM synthesis is not configured; the conclusions below are a statistical fallback.)`)
+  const avgText = input.stats.avgOverall != null ? input.stats.avgOverall.toFixed(2) : '—'
   return {
-    overallAssessment: `${band}。平均综合分 ${input.stats.avgOverall != null ? input.stats.avgOverall.toFixed(2) : '—'} / 10，违规 ${input.stats.violations} 次。${why}`,
+    overallAssessment: L(`${band}。平均综合分 ${avgText} / 10，违规 ${input.stats.violations} 次。${why}`, `${band}. Average overall score ${avgText} / 10, ${input.stats.violations} violation(s). ${why}`),
     dimensions: DIM_KEYS.map(k => ({
       key: k,
-      assessment: typeof dimMeans[k] === 'number' ? `均分 ${(dimMeans[k] as number).toFixed(1)} / 10` : '无数据',
+      assessment: typeof dimMeans[k] === 'number' ? L(`均分 ${(dimMeans[k] as number).toFixed(1)} / 10`, `Average ${(dimMeans[k] as number).toFixed(1)} / 10`) : L('无数据', 'No data'),
       suggestion: '',
     })),
-    strengths: top.map(x => `${input.dimNames[x.k]} 表现较好（均分 ${x.v.toFixed(1)}）`),
+    strengths: top.map(x => L(`${input.dimNames[x.k]} 表现较好（均分 ${x.v.toFixed(1)}）`, `${input.dimNames[x.k]} performs well (avg ${x.v.toFixed(1)})`)),
     weaknesses: [
-      ...bottom.map(x => `${input.dimNames[x.k]} 偏弱（均分 ${x.v.toFixed(1)}）`),
-      ...(violationTurns.length > 0 ? [`存在 ${violationTurns.length} 次安全/边界违规，详见安全与边界`] : []),
+      ...bottom.map(x => L(`${input.dimNames[x.k]} 偏弱（均分 ${x.v.toFixed(1)}）`, `${input.dimNames[x.k]} is weak (avg ${x.v.toFixed(1)})`)),
+      ...(violationTurns.length > 0 ? [L(`存在 ${violationTurns.length} 次安全/边界违规，详见安全与边界`, `${violationTurns.length} safety/boundary violation(s); see Safety and boundaries`)] : []),
     ],
-    promptChanges: input.suggestions.slice(0, 5).join('；') || '（无建议）',
+    promptChanges: input.suggestions.slice(0, 5).join(L('；', '; ')) || L('（无建议）', '(no suggestions)'),
     revisedPrompt: '',
-    memoryIssues: input.stats.memoryMisses > 0 ? `记忆未命中 ${input.stats.memoryMisses} 次` : '无',
+    memoryIssues: input.stats.memoryMisses > 0 ? L(`记忆未命中 ${input.stats.memoryMisses} 次`, `${input.stats.memoryMisses} memory miss(es)`) : L('无', 'None'),
     safetyIssues: safety,
     prioritizedActions: input.suggestions.slice(0, 5),
   }

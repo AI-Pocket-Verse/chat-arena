@@ -1,5 +1,6 @@
 import { type ReactNode, useState } from 'react'
 import { DonutChart, LineChart, RadarChart } from './charts'
+import { useI18n, type MessageKey, type TFunction } from './i18n'
 
 // 评测报告的可视化视图（图表 + 卡片），数据来自报告 JSON 快照。
 
@@ -114,42 +115,43 @@ function scoreColor(v: number): string {
 }
 
 const DIM_ORDER = ['personaFit', 'empathy', 'memoryAccuracy', 'safety', 'naturalness', 'relevance']
-const DIM_NAMES: Record<string, string> = {
-  personaFit: '人设贴合', empathy: '情感共情', memoryAccuracy: '记忆准确',
-  safety: '安全合规', naturalness: '自然流畅', relevance: '相关性',
+const DIM_NAMES: Record<string, MessageKey> = {
+  personaFit: 'reports.view.dim.personaFit', empathy: 'reports.view.dim.empathy', memoryAccuracy: 'reports.view.dim.memoryAccuracy',
+  safety: 'reports.view.dim.safety', naturalness: 'reports.view.dim.naturalness', relevance: 'reports.view.dim.relevance',
 }
 
-function turnTag(t: ReportTurn): string {
-  const persona = t.personaName?.trim() || '会话'
-  const rep = typeof t.repetitionIndex === 'number' ? ` · 重复#${t.repetitionIndex + 1}` : ''
-  return `${persona}${rep} · 第 ${t.idx + 1} 轮`
+function turnTag(turn: ReportTurn, t: TFunction): string {
+  const persona = turn.personaName?.trim() || t('reports.view.turn.session')
+  const rep = typeof turn.repetitionIndex === 'number' ? t('reports.view.turn.repetition', { n: turn.repetitionIndex + 1 }) : ''
+  return t('reports.view.turn.tag', { persona, rep, n: turn.idx + 1 })
 }
 const turnKey = (t: ReportTurn, p: string) => `${p}-${t.sessionId ?? ''}-${t.idx}`
 
-function TurnCard({ t }: { t: ReportTurn }) {
-  const dimChips = DIM_ORDER.filter(k => fin(t.dims[k])).map(k => `${DIM_NAMES[k] ?? k} ${t.dims[k]}`)
+function TurnCard({ t: turn }: { t: ReportTurn }) {
+  const { t } = useI18n()
+  const dimChips = DIM_ORDER.filter(k => fin(turn.dims[k])).map(k => { const name = DIM_NAMES[k]; return `${name ? t(name) : k} ${turn.dims[k]}` })
   return (
     <div className="rounded-xl border border-[#ECECF2] bg-white p-4" style={cardShadow}>
       <div className="flex items-center justify-between mb-2 gap-2">
-        <span className="text-[10px] uppercase tracking-widest text-[#C2C7D0] font-mono truncate">{turnTag(t)}</span>
+        <span className="text-[10px] uppercase tracking-widest text-[#C2C7D0] font-mono truncate">{turnTag(turn, t)}</span>
         <span className="inline-flex items-baseline gap-1 shrink-0">
-          <span className="text-lg font-bold font-mono" style={{ color: scoreColor(t.overall) }}>{t.overall.toFixed(1)}</span>
+          <span className="text-lg font-bold font-mono" style={{ color: scoreColor(turn.overall) }}>{turn.overall.toFixed(1)}</span>
           <span className="text-[10px] text-[#9CA3AF]">/ 10</span>
-          {t.violation && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-[#DC2626]/10 text-[#DC2626]">违规</span>}
+          {turn.violation && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-[#DC2626]/10 text-[#DC2626]">{t('reports.view.turn.violation')}</span>}
         </span>
       </div>
       <div className="space-y-1.5 text-sm">
-        <div className="text-[#15171E]"><span className="text-[#9CA3AF] mr-1">用户</span>{t.userText}</div>
-        <div className="text-[#15171E]"><span className="text-[#1664FF] mr-1 font-medium">被测 AI</span>{t.targetText}</div>
+        <div className="text-[#15171E]"><span className="text-[#9CA3AF] mr-1">{t('reports.view.turn.user')}</span>{turn.userText}</div>
+        <div className="text-[#15171E]"><span className="text-[#1664FF] mr-1 font-medium">{t('reports.view.turn.target')}</span>{turn.targetText}</div>
       </div>
       {dimChips.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1">
           {dimChips.map(c => <span key={c} className="text-[10px] px-1.5 py-0.5 rounded bg-[#F1F3F9] text-[#6B7280] font-mono">{c}</span>)}
         </div>
       )}
-      {t.comment && <div className="mt-2 text-xs text-[#6B7280]">{t.comment}</div>}
-      {t.improvementSuggestion && (
-        <div className="mt-1 text-xs text-[#9CA3AF]"><span className="text-[#1664FF] font-medium mr-1">改进</span>{t.improvementSuggestion}</div>
+      {turn.comment && <div className="mt-2 text-xs text-[#6B7280]">{turn.comment}</div>}
+      {turn.improvementSuggestion && (
+        <div className="mt-1 text-xs text-[#9CA3AF]"><span className="text-[#1664FF] font-medium mr-1">{t('reports.view.turn.improve')}</span>{turn.improvementSuggestion}</div>
       )}
     </div>
   )
@@ -159,6 +161,7 @@ function TurnCard({ t }: { t: ReportTurn }) {
 const VIOLATIONS_PER_PAGE = 5
 
 function ViolationList({ turns }: { turns: ReportTurn[] }) {
+  const { t } = useI18n()
   const [page, setPage] = useState(0)
   const pageCount = Math.max(1, Math.ceil(turns.length / VIOLATIONS_PER_PAGE))
   const cur = Math.min(page, pageCount - 1)
@@ -166,13 +169,13 @@ function ViolationList({ turns }: { turns: ReportTurn[] }) {
   const pagerBtn = 'px-2.5 py-1 rounded-lg text-xs border border-[#E8E8EE] bg-white text-[#6B7280] hover:text-[#15171E] hover:border-[#1664FF]/40 disabled:opacity-40 disabled:hover:border-[#E8E8EE] disabled:hover:text-[#6B7280] transition-colors'
   return (
     <div className="mt-3 space-y-2">
-      <div className="text-xs font-medium text-[#DC2626]">违规清单（{turns.length}）</div>
-      {slice.map(t => <TurnCard key={turnKey(t, 'v')} t={t} />)}
+      <div className="text-xs font-medium text-[#DC2626]">{t('reports.view.violationList', { n: turns.length })}</div>
+      {slice.map(turn => <TurnCard key={turnKey(turn, 'v')} t={turn} />)}
       {pageCount > 1 && (
         <div className="flex items-center justify-center gap-3 pt-1">
-          <button type="button" className={pagerBtn} disabled={cur === 0} onClick={() => setPage(cur - 1)}>上一页</button>
+          <button type="button" className={pagerBtn} disabled={cur === 0} onClick={() => setPage(cur - 1)}>{t('reports.view.prevPage')}</button>
           <span className="text-xs text-[#9CA3AF] font-mono">{cur + 1} / {pageCount}</span>
-          <button type="button" className={pagerBtn} disabled={cur >= pageCount - 1} onClick={() => setPage(cur + 1)}>下一页</button>
+          <button type="button" className={pagerBtn} disabled={cur >= pageCount - 1} onClick={() => setPage(cur + 1)}>{t('reports.view.nextPage')}</button>
         </div>
       )}
     </div>
@@ -200,6 +203,7 @@ function lineDiff(a: string, b: string): { aCommon: boolean[]; bCommon: boolean[
 }
 
 function PromptDiff({ original, revised }: { original: string; revised: string }) {
+  const { t } = useI18n()
   const { aCommon, bCommon, aLines, bLines } = lineDiff(original, revised)
   const pane = (lines: string[], common: boolean[], side: 'l' | 'r') => (
     <pre className="flex-1 min-w-0 text-xs leading-relaxed bg-[#F7F8FB] border border-[#ECECF2] rounded-lg p-3 overflow-auto max-h-[50vh] whitespace-pre-wrap break-words font-mono">
@@ -218,11 +222,11 @@ function PromptDiff({ original, revised }: { original: string; revised: string }
   return (
     <div className="flex flex-col lg:flex-row gap-3">
       <div className="flex-1 min-w-0">
-        <div className="text-[11px] text-[#9CA3AF] mb-1">原始角色 Prompt</div>
+        <div className="text-[11px] text-[#9CA3AF] mb-1">{t('reports.view.originalPrompt')}</div>
         {pane(aLines, aCommon, 'l')}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-[11px] text-[#9CA3AF] mb-1">修订版（<span className="text-[#DC2626]">标红=改动</span>）</div>
+        <div className="text-[11px] text-[#9CA3AF] mb-1">{t('reports.view.revised')}<span className="text-[#DC2626]">{t('reports.view.revisedMark')}</span>{t('reports.view.revisedEnd')}</div>
         {pane(bLines, bCommon, 'r')}
       </div>
     </div>
@@ -230,24 +234,25 @@ function PromptDiff({ original, revised }: { original: string; revised: string }
 }
 
 // 锚点导航
-const ANCHORS: Array<{ id: string; label: string }> = [
-  { id: 'sec-overall', label: '总体评价' },
-  { id: 'sec-dims', label: '各维度评估' },
-  { id: 'sec-dist', label: '评分分布' },
-  { id: 'sec-sw', label: '亮点 / 问题' },
-  { id: 'sec-actions', label: '优先改进' },
-  { id: 'sec-prompt', label: 'Prompt 修订' },
-  { id: 'sec-safety', label: '安全与边界' },
-  { id: 'sec-replay', label: '回放样例' },
+const ANCHORS: Array<{ id: string; label: MessageKey }> = [
+  { id: 'sec-overall', label: 'reports.view.anchor.overall' },
+  { id: 'sec-dims', label: 'reports.view.anchor.dims' },
+  { id: 'sec-dist', label: 'reports.view.anchor.dist' },
+  { id: 'sec-sw', label: 'reports.view.anchor.sw' },
+  { id: 'sec-actions', label: 'reports.view.anchor.actions' },
+  { id: 'sec-prompt', label: 'reports.view.anchor.prompt' },
+  { id: 'sec-safety', label: 'reports.view.anchor.safety' },
+  { id: 'sec-replay', label: 'reports.view.anchor.replay' },
 ]
 
 export function ReportView({ data }: { data: ReportData }) {
+  const { t } = useI18n()
   const radarItems = data.dimensions.map(d => ({ label: d.name, value: fin(d.score) ? d.score : null }))
   const distSlices = [
-    { label: '优秀 (≥8)', value: data.distribution.excellent, color: '#1664FF' },
-    { label: '良好 [6,8)', value: data.distribution.good, color: '#36C5F0' },
-    { label: '一般 [4,6)', value: data.distribution.fair, color: '#FFB020' },
-    { label: '偏弱 (<4)', value: data.distribution.weak, color: '#FF6B6B' },
+    { label: t('reports.view.dist.excellent'), value: data.distribution.excellent, color: '#1664FF' },
+    { label: t('reports.view.dist.good'), value: data.distribution.good, color: '#36C5F0' },
+    { label: t('reports.view.dist.fair'), value: data.distribution.fair, color: '#FFB020' },
+    { label: t('reports.view.dist.weak'), value: data.distribution.weak, color: '#FF6B6B' },
   ]
   const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
@@ -261,62 +266,62 @@ export function ReportView({ data }: { data: ReportData }) {
             onClick={() => jump(a.id)}
             className="text-xs px-2.5 py-1 rounded-full border border-[#1664FF]/20 bg-[#1664FF]/[0.06] text-[#1664FF] font-medium hover:bg-[#1664FF]/[0.12] hover:border-[#1664FF]/40 transition-colors"
           >
-            <span className="text-[#1664FF]/55 mr-0.5">#</span>{a.label}
+            <span className="text-[#1664FF]/55 mr-0.5">#</span>{t(a.label)}
           </button>
         ))}
       </div>
 
       {/* 概览指标 */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <Chip label="平均综合分" accent value={data.avgOverall != null ? data.avgOverall.toFixed(2) : '—'} />
-        <Chip label="会话数" value={String(data.totalSessions)} />
-        <Chip label="有效评分" value={`${data.scoredTurns}/${data.totalTurns}`} />
-        <Chip label="违规数" value={String(data.violations)} />
-        <Chip label="记忆命中" value={data.memoryHitRate != null ? `${(data.memoryHitRate * 100).toFixed(0)}%` : '—'} />
-        <Chip label="裁判失败" value={String(data.judgeFailedCount)} />
+        <Chip label={t('reports.view.chip.avg')} accent value={data.avgOverall != null ? data.avgOverall.toFixed(2) : '—'} />
+        <Chip label={t('reports.view.chip.sessions')} value={String(data.totalSessions)} />
+        <Chip label={t('reports.view.chip.scored')} value={`${data.scoredTurns}/${data.totalTurns}`} />
+        <Chip label={t('reports.view.chip.violations')} value={String(data.violations)} />
+        <Chip label={t('reports.view.chip.memoryHit')} value={data.memoryHitRate != null ? `${(data.memoryHitRate * 100).toFixed(0)}%` : '—'} />
+        <Chip label={t('reports.view.chip.judgeFailed')} value={String(data.judgeFailedCount)} />
       </div>
 
       {/* 总体评价 */}
       {data.overallAssessment.trim() && (
-        <Card id="sec-overall" title="总体评价">
+        <Card id="sec-overall" title={t('reports.view.overall')}>
           <p className="text-sm text-[#374151] leading-relaxed whitespace-pre-wrap">{data.overallAssessment}</p>
         </Card>
       )}
 
       {/* 评分档位占比 + 综合分趋势（维度均分挪到下方雷达，给档位图留足空间） */}
       <div id="sec-dist" className="grid grid-cols-1 lg:grid-cols-2 gap-5 scroll-mt-20">
-        <Card title="评分档位占比" hint={`有效评分 ${data.scoredTurns} 轮`}>
-          <DonutChart slices={distSlices} centerValue={data.avgOverall != null ? data.avgOverall.toFixed(1) : '—'} centerLabel="平均分" />
+        <Card title={t('reports.view.distTitle')} hint={t('reports.view.distHint', { n: data.scoredTurns })}>
+          <DonutChart slices={distSlices} centerValue={data.avgOverall != null ? data.avgOverall.toFixed(1) : '—'} centerLabel={t('reports.view.avgLabel')} />
         </Card>
-        <Card title="每轮综合分趋势" hint={data.scoreSeries.length > 1 ? `${data.scoreSeries.length} 轮 · 跨会话拼接` : undefined}>
+        <Card title={t('reports.view.trendTitle')} hint={data.scoreSeries.length > 1 ? t('reports.view.trendHint', { n: data.scoreSeries.length }) : undefined}>
           {data.scoreSeries.length > 1
             ? <LineChart values={data.scoreSeries} max={10} height={200} valueFmt={(v) => v.toFixed(0)} />
-            : <div className="flex items-center justify-center text-xs text-[#9CA3AF]" style={{ height: 200 }}>评分轮数不足</div>}
+            : <div className="flex items-center justify-center text-xs text-[#9CA3AF]" style={{ height: 200 }}>{t('reports.view.trendInsufficient')}</div>}
         </Card>
       </div>
 
       {/* 各维度评估：仅雷达图（满分 10） */}
-      <Card id="sec-dims" title="各维度评估" hint="满分 10">
+      <Card id="sec-dims" title={t('reports.view.dimsTitle')} hint={t('reports.view.dimsHint')}>
         <div className="max-w-[420px] mx-auto w-full"><RadarChart items={radarItems} max={10} size={240} /></div>
       </Card>
 
       {/* 亮点 / 主要问题 */}
       <div id="sec-sw" className="grid grid-cols-1 sm:grid-cols-2 gap-5 scroll-mt-20">
-        <Card title="亮点">
+        <Card title={t('reports.view.strengths')}>
           {data.strengths.length ? (
             <ul className="space-y-1.5">{data.strengths.map((s, i) => <li key={i} className="text-sm text-[#374151] flex gap-2"><span className="text-[#059669] shrink-0">✓</span>{s}</li>)}</ul>
-          ) : <p className="text-xs text-[#9CA3AF]">（无）</p>}
+          ) : <p className="text-xs text-[#9CA3AF]">{t('reports.view.none')}</p>}
         </Card>
-        <Card title="主要问题">
+        <Card title={t('reports.view.weaknesses')}>
           {data.weaknesses.length ? (
             <ul className="space-y-1.5">{data.weaknesses.map((s, i) => <li key={i} className="text-sm text-[#374151] flex gap-2"><span className="text-[#DC2626] shrink-0">!</span>{s}</li>)}</ul>
-          ) : <p className="text-xs text-[#9CA3AF]">（无）</p>}
+          ) : <p className="text-xs text-[#9CA3AF]">{t('reports.view.none')}</p>}
         </Card>
       </div>
 
       {/* 优先改进清单 */}
       {data.prioritizedActions.length > 0 && (
-        <Card id="sec-actions" title="优先改进清单">
+        <Card id="sec-actions" title={t('reports.view.actions')}>
           <ol className="space-y-2">
             {data.prioritizedActions.map((s, i) => (
               <li key={i} className="flex gap-3 text-sm text-[#374151]">
@@ -329,20 +334,20 @@ export function ReportView({ data }: { data: ReportData }) {
       )}
 
       {/* 角色 Prompt 修订建议（左原始 / 右修订，标红 diff） */}
-      <Card id="sec-prompt" title="角色 Prompt 修订建议">
+      <Card id="sec-prompt" title={t('reports.view.promptTitle')}>
         {data.promptChanges.trim() && <p className="text-sm text-[#374151] leading-relaxed whitespace-pre-wrap mb-4">{data.promptChanges}</p>}
         {data.originalPrompt && data.revisedPrompt
           ? <PromptDiff original={data.originalPrompt} revised={data.revisedPrompt} />
           : data.originalPrompt
-            ? <div className="text-xs text-[#9CA3AF]">未生成修订版（LLM 不可用或未启用）。</div>
-            : <div className="text-xs text-[#9CA3AF]">未能获取角色原始 Prompt（被测后端不可达），仅显示上面的文字改动建议。</div>}
+            ? <div className="text-xs text-[#9CA3AF]">{t('reports.view.noRevision')}</div>
+            : <div className="text-xs text-[#9CA3AF]">{t('reports.view.noOriginal')}</div>}
       </Card>
 
       {/* 记忆 + 安全与边界（含违规清单） */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <Card title="记忆系统"><p className="text-sm text-[#374151] leading-relaxed whitespace-pre-wrap">{data.memoryIssues.trim() || '无'}</p></Card>
-        <Card id="sec-safety" title="安全与边界" hint={`违规 ${data.violationTurns.length}`}>
-          <p className="text-sm text-[#374151] leading-relaxed whitespace-pre-wrap">{data.safetyIssues.trim() || '无'}</p>
+        <Card title={t('reports.view.memory')}><p className="text-sm text-[#374151] leading-relaxed whitespace-pre-wrap">{data.memoryIssues.trim() || t('reports.view.noneShort')}</p></Card>
+        <Card id="sec-safety" title={t('reports.view.safety')} hint={t('reports.view.safetyHint', { n: data.violationTurns.length })}>
+          <p className="text-sm text-[#374151] leading-relaxed whitespace-pre-wrap">{data.safetyIssues.trim() || t('reports.view.noneShort')}</p>
           {data.violationTurns.length > 0 && <ViolationList key={data.runId} turns={data.violationTurns} />}
         </Card>
       </div>
@@ -351,14 +356,14 @@ export function ReportView({ data }: { data: ReportData }) {
       <div id="sec-replay" className="space-y-5 scroll-mt-20">
         {data.worstTurns.length > 0 && (
           <div>
-            <h3 className="text-sm font-semibold text-[#15171E] mb-2">低分回放（Top {data.worstTurns.length}）</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">{data.worstTurns.map(t => <TurnCard key={turnKey(t, 'w')} t={t} />)}</div>
+            <h3 className="text-sm font-semibold text-[#15171E] mb-2">{t('reports.view.worst', { n: data.worstTurns.length })}</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">{data.worstTurns.map(turn => <TurnCard key={turnKey(turn, 'w')} t={turn} />)}</div>
           </div>
         )}
         {data.bestTurns.length > 0 && (
           <div>
-            <h3 className="text-sm font-semibold text-[#15171E] mb-2">高分样例（Top {data.bestTurns.length}）</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">{data.bestTurns.map(t => <TurnCard key={turnKey(t, 'b')} t={t} />)}</div>
+            <h3 className="text-sm font-semibold text-[#15171E] mb-2">{t('reports.view.best', { n: data.bestTurns.length })}</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">{data.bestTurns.map(turn => <TurnCard key={turnKey(turn, 'b')} t={turn} />)}</div>
           </div>
         )}
       </div>

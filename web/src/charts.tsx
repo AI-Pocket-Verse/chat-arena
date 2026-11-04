@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useI18n } from './i18n'
 
 // 纯 SVG / CSS 图表，无第三方依赖（与 Compare 的雷达图一致的手写风格）。
 // 首次挂载时播放一次入场动画：line 用 stroke-dashoffset 描边，bar 用 height 过渡，
@@ -28,6 +29,7 @@ export function LineChart({
   valueFmt?: (v: number) => string
 }) {
   const grown = useGrown()
+  const { t } = useI18n()
   const W = 560
   const H = height
   const padX = 36
@@ -35,7 +37,7 @@ export function LineChart({
   const n = values.length
 
   if (n === 0) {
-    return <div className="flex items-center justify-center text-xs text-[#9CA3AF]" style={{ height: H }}>暂无数据</div>
+    return <div className="flex items-center justify-center text-xs text-[#9CA3AF]" style={{ height: H }}>{t('dashboard.chart.noData')}</div>
   }
 
   const innerW = W - padX * 2
@@ -118,8 +120,9 @@ export function BarChart({
   valueFmt?: (v: number) => string
 }) {
   const grown = useGrown()
+  const { t } = useI18n()
   if (items.length === 0) {
-    return <div className="flex items-center justify-center text-xs text-[#9CA3AF]" style={{ height }}>暂无数据</div>
+    return <div className="flex items-center justify-center text-xs text-[#9CA3AF]" style={{ height }}>{t('dashboard.chart.noData')}</div>
   }
   return (
     <div className="flex items-end gap-3" style={{ height }}>
@@ -148,7 +151,7 @@ export function BarChart({
 
 // ── 环形图（饼图）──────────────────────────────────────────────────────────
 export function DonutChart({
-  slices, size = 188, thickness = 26, centerLabel, centerValue,
+  slices, size = 160, thickness = 24, centerLabel, centerValue,
 }: {
   slices: Array<{ label: string; value: number; color: string }>
   size?: number
@@ -157,6 +160,7 @@ export function DonutChart({
   centerValue?: string
 }) {
   const grown = useGrown()
+  const { t } = useI18n()
   const total = slices.reduce((s, x) => s + x.value, 0)
   const r = (size - thickness) / 2
   const c = 2 * Math.PI * r
@@ -165,7 +169,8 @@ export function DonutChart({
 
   let acc = 0
   return (
-    <div className="flex items-center gap-5">
+    // 卡片窄、放不下完整图例时，图例换到圆环下方，而不是截断档位名
+    <div className="flex flex-wrap items-center justify-center gap-5">
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" className="shrink-0">
         <g transform={`rotate(-90 ${cx} ${cy})`}>
           <circle cx={cx} cy={cy} r={r} fill="none" stroke="#EEF0F4" strokeWidth={thickness} />
@@ -198,19 +203,19 @@ export function DonutChart({
           </>
         )}
       </svg>
-      <div className="space-y-2 min-w-0">
+      <div className="space-y-2 flex-1 min-w-[9.5rem]">
         {slices.map((s) => {
           const pct = total > 0 ? Math.round((s.value / total) * 100) : 0
           return (
             <div key={s.label} className="flex items-center gap-2 text-xs">
               <span className="h-2.5 w-2.5 rounded-sm shrink-0" style={{ background: s.color }} />
-              <span className="text-[#6B7280] truncate">{s.label}</span>
+              <span className="text-[#6B7280] whitespace-nowrap">{s.label}</span>
               <span className="ml-auto font-mono text-[#15171E]">{s.value}</span>
               <span className="text-[#9CA3AF] w-9 text-right">{pct}%</span>
             </div>
           )
         })}
-        {total === 0 && <div className="text-xs text-[#9CA3AF]">暂无评分数据</div>}
+        {total === 0 && <div className="text-xs text-[#9CA3AF]">{t('dashboard.chart.noScoreData')}</div>}
       </div>
     </div>
   )
@@ -226,9 +231,10 @@ export function RadarChart({
   color?: string
 }) {
   const grown = useGrown()
+  const { t } = useI18n()
   const n = items.length
   if (n < 3) {
-    return <div className="flex items-center justify-center text-xs text-[#9CA3AF]" style={{ height: size }}>暂无足够维度</div>
+    return <div className="flex items-center justify-center text-xs text-[#9CA3AF]" style={{ height: size }}>{t('dashboard.chart.noDims')}</div>
   }
   const cx = size / 2
   const cy = size / 2

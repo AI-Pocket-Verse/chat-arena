@@ -1,4 +1,5 @@
 import OpenAI from 'openai'
+import { pick, type Lang } from '../i18n'
 import type { ZodSchema } from 'zod'
 
 import providersJson from '@chat-arena/shared/providers.json'
@@ -7,6 +8,8 @@ import providersJson from '@chat-arena/shared/providers.json'
 export interface ProviderDef {
   id: string
   label: string
+  /** 英文界面显示的名字，缺省时用 label */
+  labelEn?: string
   /** 环境变量前缀：<env>_API_KEY / <env>_BASE_URL / <env>_MODELS */
   env: string
   baseUrl: string
@@ -37,6 +40,11 @@ export interface ChatMessage {
 }
 
 export type ModelRegistry = Record<string, ResolvedModel>
+
+/** 模型下拉里显示的名字，供应商名跟随界面语言 */
+export function modelLabel(m: ResolvedModel, lang: Lang): string {
+  return lang === 'en' && m.provider.labelEn ? `${m.provider.labelEn} · ${m.model}` : m.label
+}
 
 const list = (v: string | undefined) => (v ?? '').split(',').map((s) => s.trim()).filter(Boolean)
 
@@ -73,16 +81,19 @@ export function resolveModel(reg: ModelRegistry, id: string): ResolvedModel {
 export function modelConfigError(
   reg: ModelRegistry,
   id: string,
+  lang: Lang = 'zh',
 ): { error: 'unknown_model' | 'model_key_missing'; message: string } | null {
   const m = reg[id]
   if (!m) {
     const [pid] = id.split(':')
     const p = PROVIDERS.find((x) => x.id === pid)
-    const hint = p ? `请在 api/.env.dev（生产为 .env.prod）的 ${p.env}_MODELS 里登记` : '模型 id 格式为 <供应商>:<模型名>，如 qwen:qwen-plus'
-    return { error: 'unknown_model', message: `未知模型：${id}，${hint}` }
+    const hint = p
+      ? pick(lang, { zh: `请在 api/.env.dev（生产为 .env.prod）的 ${p.env}_MODELS 里登记`, en: `list it in ${p.env}_MODELS in api/.env.dev (api/.env.prod in production)` })
+      : pick(lang, { zh: '模型 id 格式为 <供应商>:<模型名>，如 qwen:qwen-plus', en: 'model ids look like <provider>:<model>, e.g. qwen:qwen-plus' })
+    return { error: 'unknown_model', message: pick(lang, { zh: `未知模型：${id}，${hint}`, en: `Unknown model: ${id}; ${hint}` }) }
   }
-  if (!m.apiKey && !m.provider.keyOptional) return { error: 'model_key_missing', message: `模型 ${id} 缺少 API Key，请在 api/.env.dev（生产为 .env.prod）配置 ${m.provider.env}_API_KEY` }
-  if (!m.baseURL) return { error: 'model_key_missing', message: `模型 ${id} 缺少接口地址，请配置 ${m.provider.env}_BASE_URL` }
+  if (!m.apiKey && !m.provider.keyOptional) return { error: 'model_key_missing', message: pick(lang, { zh: `模型 ${id} 缺少 API Key，请在 api/.env.dev（生产为 .env.prod）配置 ${m.provider.env}_API_KEY`, en: `Model ${id} has no API key. Set ${m.provider.env}_API_KEY in api/.env.dev (api/.env.prod in production)` }) }
+  if (!m.baseURL) return { error: 'model_key_missing', message: pick(lang, { zh: `模型 ${id} 缺少接口地址，请配置 ${m.provider.env}_BASE_URL`, en: `Model ${id} has no endpoint. Set ${m.provider.env}_BASE_URL` }) }
   return null
 }
 

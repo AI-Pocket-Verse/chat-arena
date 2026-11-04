@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { currentLang, translator } from './i18n'
 
 /**
  * 页面级错误边界。React 默认在渲染期抛异常时卸载整棵树，页面变成纯白且没有任何提示；
@@ -29,12 +30,14 @@ export class ErrorBoundary extends Component<Props, State> {
   override render() {
     const { error } = this.state
     if (!error) return this.props.children
+    // class 组件用不了 hook，按当前语言取翻译函数
+    const t = translator(currentLang())
 
     return (
       <div className="flex h-full min-h-0 items-center justify-center p-6">
         <div className="w-full max-w-md rounded-xl border border-line bg-elevated p-5 text-center shadow-sm">
-          <p className="text-base font-semibold text-fg">页面出错了</p>
-          <p className="mt-1.5 text-sm text-fg-muted">可以点「重试」恢复；反复出现的话，请带上下面这行信息反馈。</p>
+          <p className="text-base font-semibold text-fg">{t('error.pageCrashed')}</p>
+          <p className="mt-1.5 text-sm text-fg-muted">{t('error.pageCrashedHint')}</p>
           <p className="mt-3 break-all rounded-md bg-surface px-3 py-2 text-left font-mono text-xs text-fg-faint">
             {error.name}: {error.message}
           </p>
@@ -43,7 +46,7 @@ export class ErrorBoundary extends Component<Props, State> {
             onClick={() => this.setState({ error: null })}
             className="mt-4 rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-fg transition-colors hover:bg-accent/90"
           >
-            重试
+            {t('common.retry')}
           </button>
         </div>
       </div>

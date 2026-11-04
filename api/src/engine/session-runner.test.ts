@@ -359,9 +359,9 @@ describe('runSession', () => {
       injectedFacts: [{ key: 'pet', value: '橘子猫', injectAtTurn: 1 }], // 1-based → idx=0
     }
     await runSession(args, { ...sessionInput, persona: personaWithInject, cond: { maxTurns: 1 } })
-    // extraInstruction should have been provided on the first call (idx=0)
+    // the inject cue should have been provided on the first call (idx=0)
     const calls = nextUserMessage.mock.calls as any[][]
-    expect(calls[0]?.[2]).toContain('橘子猫')
+    expect(calls[0]?.[2]).toEqual({ kind: 'inject', key: 'pet', value: '橘子猫' })
   })
 
   it('[Bug5a] probeAtTurn=2 fires on idx=1 (1-based scheduling)', async () => {
@@ -378,7 +378,7 @@ describe('runSession', () => {
     await runSession(args, { ...sessionInput, persona: personaWithProbe, cond: { maxTurns: 2 } })
     // probeAtTurn=2 → should fire on second turn (idx=1)
     const calls = nextUserMessage.mock.calls as any[][]
-    expect(calls[1]?.[2]).toContain('宠物')
+    expect(calls[1]?.[2]).toEqual({ kind: 'probe', question: '我的宠物叫什么' })
     // saveMemoryCheck called once (on probe turn)
     expect(saveMemoryCheck).toHaveBeenCalledTimes(1)
   })
@@ -406,9 +406,9 @@ describe('runSession', () => {
     expect(call?.factKey).toBe('hometown')
     // target said '记得，苏州' → recalled=true
     expect(call?.recalled).toBe(true)
-    // The question was given as extraInstruction on the carry-over turn
+    // The question was given as a probe cue on the carry-over turn
     const personaCalls = nextUserMessage.mock.calls as any[][]
-    expect(personaCalls[1]?.[2]).toContain('老家哪里')
+    expect(personaCalls[1]?.[2]).toEqual({ kind: 'probe', question: '老家哪里' })
   })
 
   it('[Bug5b] probe is NOT carried over in replay mode (scripted turns are fixed)', async () => {

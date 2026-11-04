@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { api, type TargetRole, type PersonaRow, type PersonaStructured } from '../api'
 import { ConfirmDialog } from '../confirm-dialog'
+import { useI18n } from '../i18n'
 import { type HydrateSession, type TurnView, useLive } from '../store'
 import { useUi } from '../ui-store'
 import { connectRunWs, type WsHandle } from '../ws'
@@ -41,12 +42,13 @@ function InitialCircle({ name, kind }: { name: string; kind: 'user' | 'target' }
 
 // 导出图片用：单条「对话 + 评分」卡片，全部内联样式（html-to-image 渲染最稳定）
 function ExportCard({ t, userName, targetName }: { t: TurnView; userName: string; targetName: string }) {
+  const { t: tr } = useI18n()
   const s = t.score
   const label10 = { fontSize: 10, letterSpacing: '0.15em', textTransform: 'uppercase' as const, color: '#C2C7D0', fontFamily: 'monospace' }
   return (
     <div style={{ display: 'flex', alignItems: 'stretch', border: '1px solid #ECECF2', borderRadius: 16, overflow: 'hidden', marginBottom: 12, background: '#fff' }}>
       <div style={{ flex: 1, minWidth: 0, padding: 16 }}>
-        <div style={{ ...label10, marginBottom: 10 }}>对话 · 第 {t.idx + 1} 轮</div>
+        <div style={{ ...label10, marginBottom: 10 }}>{tr('observe.turn.label', { n: t.idx + 1 })}</div>
         {t.userText && (
           <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start', gap: 8, marginBottom: 10 }}>
             <div style={{ maxWidth: '78%', borderRadius: 16, borderTopRightRadius: 4, background: '#F1F3F9', border: '1px solid #E8E8EE', padding: '10px 14px', fontSize: 13, color: '#15171E', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
@@ -67,19 +69,19 @@ function ExportCard({ t, userName, targetName }: { t: TurnView; userName: string
         )}
       </div>
       <div style={{ width: 280, flexShrink: 0, borderLeft: '1px solid #ECECF2', background: '#FAFBFD', padding: 16, boxSizing: 'border-box' }}>
-        <div style={{ ...label10, marginBottom: 8 }}>评分</div>
+        <div style={{ ...label10, marginBottom: 8 }}>{tr('observe.score.title')}</div>
         {s === undefined ? <div style={{ fontSize: 12, color: '#C2C7D0' }}>—</div>
-          : s === null ? <div style={{ fontSize: 12, color: '#9CA3AF' }}>评分中…</div>
-          : s.judgeError ? <div style={{ fontSize: 12, color: '#D97706' }}>裁判异常：{s.judgeError}</div>
+          : s === null ? <div style={{ fontSize: 12, color: '#9CA3AF' }}>{tr('observe.score.pending')}</div>
+          : s.judgeError ? <div style={{ fontSize: 12, color: '#D97706' }}>{tr('observe.score.judgeError', { error: s.judgeError })}</div>
           : (
             <div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 8 }}>
                 <span style={{ fontSize: 30, fontWeight: 700, fontFamily: 'monospace', color: '#1664FF', lineHeight: 1 }}>{s.overall?.toFixed(1) ?? '—'}</span>
                 <span style={{ fontSize: 12, color: '#9CA3AF' }}>/ 10</span>
-                {s.violation && <span style={{ marginLeft: 'auto', fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(220,38,38,0.1)', color: '#DC2626', fontWeight: 500 }}>违规</span>}
+                {s.violation && <span style={{ marginLeft: 'auto', fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(220,38,38,0.1)', color: '#DC2626', fontWeight: 500 }}>{tr('observe.score.violation')}</span>}
               </div>
               {s.comment && <div style={{ fontSize: 12, color: '#6B7280', lineHeight: 1.6, marginBottom: 8 }}>{s.comment}</div>}
-              {s.suggestion && <div style={{ fontSize: 12, color: '#9CA3AF', borderTop: '1px solid #ECECF2', paddingTop: 8 }}><span style={{ color: '#1664FF', fontWeight: 500, marginRight: 4 }}>改进</span>{s.suggestion}</div>}
+              {s.suggestion && <div style={{ fontSize: 12, color: '#9CA3AF', borderTop: '1px solid #ECECF2', paddingTop: 8 }}><span style={{ color: '#1664FF', fontWeight: 500, marginRight: 4 }}>{tr('observe.score.suggestion')}</span>{s.suggestion}</div>}
             </div>
           )}
       </div>
@@ -95,6 +97,7 @@ function ExportCard({ t, userName, targetName }: { t: TurnView; userName: string
 type ObserveMode = 'loading' | 'live' | 'replay' | 'cta'
 
 export function Observe() {
+  const { t: tr } = useI18n()
   const { turns, sessions, apply, reset, hydrate } = useLive()
   const { runId: storeRunId } = useUi()
   const navigate = useNavigate()
@@ -456,11 +459,11 @@ export function Observe() {
     try {
       // 防御性兜底：勾选后可能新轮次开始流式，过滤掉此时仍未完成的轮次
       const exportableTurns = selectedTurns.filter((t) => !isNotExportable(t))
-      if (exportableTurns.length === 0) { setGenError('所选轮次均在生成中，请等待回复完成后再导出'); return }
+      if (exportableTurns.length === 0) { setGenError(tr('observe.gen.allStreaming')); return }
       // 等待导出节点按当前勾选渲染/布局完成（双 rAF）再量高
       await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())))
       const node = exportRef.current
-      if (!node) { setGenError('生成失败：导出节点未就绪，请重试'); return }
+      if (!node) { setGenError(tr('observe.gen.nodeNotReady')); return }
       const heightPx = node.scrollHeight
       if (heightPx > MAX_EXPORT_HEIGHT) {
         // 超出单图最大高度：保留多选与已选项，提示用户手动取消几条后再点生成
@@ -478,14 +481,14 @@ export function Observe() {
         // 画布外 → 生成一张空白图。这里在克隆体上覆写回原点。
         style: { position: 'static', left: '0', top: '0' },
       })
-      if (!blob) { setGenError('生成失败：浏览器未能导出图片，请重试或减少选中条数'); return }
+      if (!blob) { setGenError(tr('observe.gen.noBlob')); return }
       previewBlobRef.current = blob
       // 冻结此次导出的条数，previewUrl effect 会回收旧 URL
       setPreviewCount(exportableTurns.length)
       setPreviewUrl(URL.createObjectURL(blob))
       setCopyState('idle')
     } catch (err) {
-      setGenError(`生成失败：${err instanceof Error ? err.message : String(err)}`)
+      setGenError(tr('observe.gen.failed', { error: err instanceof Error ? err.message : String(err) }))
     } finally {
       setGenerating(false)
     }
@@ -511,7 +514,7 @@ export function Observe() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `chat-arena-${runLabel?.trim() || runId || 'image'}-${previewCount}条.png`.replace(/[/\\:?*"<>|]/g, '_')
+    a.download = `chat-arena-${runLabel?.trim() || runId || 'image'}-${tr('observe.preview.fileCount', { n: previewCount })}.png`.replace(/[/\\:?*"<>|]/g, '_')
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
@@ -519,10 +522,13 @@ export function Observe() {
     setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
 
+  // 「已选 N 条」里的数字单独加粗：用占位符切出前后两段
+  const selectedLabel = tr('observe.multi.selected', { n: '\u0000' }).split('\u0000')
+
   // 导出卡片用：把人设/角色名解析成与页面一致的展示名
   const nameFor = (t: TurnView) => {
     const persona = personaMap[sessionPersona[t.sessionId] ?? '']
-    return { userName: persona?.name ?? '用户', targetName: roleInfo?.name ?? '被测 AI' }
+    return { userName: persona?.name ?? tr('observe.defaultUser'), targetName: roleInfo?.name ?? tr('observe.defaultTarget') }
   }
 
   return (
@@ -536,7 +542,7 @@ export function Observe() {
     >
       <div className="sticky top-0 z-20 -mx-6 -mt-6 mb-6 px-6 py-4 bg-white/85 backdrop-blur border-b border-[#ECECF2] flex items-center justify-between">
         <div className="flex items-center gap-3 min-w-0">
-          <h2 className="text-xl font-semibold text-[#15171E] shrink-0">实时评测</h2>
+          <h2 className="text-xl font-semibold text-[#15171E] shrink-0">{tr('observe.title')}</h2>
           {active && runLabel && (
             <>
               <span className="text-[#D6D9E0]">/</span>
@@ -544,7 +550,7 @@ export function Observe() {
             </>
           )}
           {mode === 'replay' && (
-            <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-[#9CA3AF]/15 text-[#6B7280]">历史回放</span>
+            <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-[#9CA3AF]/15 text-[#6B7280]">{tr('observe.badge.replay')}</span>
           )}
         </div>
 
@@ -558,7 +564,7 @@ export function Observe() {
               className="px-3 py-1.5 rounded-xl text-xs font-medium border border-[#DC2626]/30 text-[#DC2626] bg-white hover:bg-[#DC2626]/5 disabled:opacity-50 transition-colors inline-flex items-center gap-1.5"
             >
               <span className="inline-block w-2 h-2 rounded-[2px] bg-[#DC2626]" />
-              {stopping ? '终止中…' : '终止'}
+              {stopping ? tr('observe.stopping') : tr('observe.stop')}
             </button>
           )}
 
@@ -590,25 +596,25 @@ export function Observe() {
               className="px-3 py-1.5 rounded-xl text-xs font-medium border border-[#E8E8EE] text-[#6B7280] bg-white hover:text-[#1664FF] hover:border-[#1664FF]/40 transition-colors inline-flex items-center gap-1.5"
             >
               <ImageDown className="w-3.5 h-3.5" />
-              生成图片
+              {tr('observe.multi.start')}
             </button>
           )}
           {active && multiSelect && (
             <div className="flex items-center gap-1.5">
-              <span className="text-xs text-[#6B7280] px-1">已选 <span className="font-semibold text-[#1664FF]">{selectedTurns.length}</span> 条</span>
+              <span className="text-xs text-[#6B7280] px-1">{selectedLabel[0]}<span className="font-semibold text-[#1664FF]">{selectedTurns.length}</span>{selectedLabel[1]}</span>
               <button type="button" onClick={selectAllVisible}
-                className="px-2.5 py-1.5 rounded-lg text-xs border border-[#E8E8EE] text-[#6B7280] bg-white hover:text-[#15171E] transition-colors">全选</button>
+                className="px-2.5 py-1.5 rounded-lg text-xs border border-[#E8E8EE] text-[#6B7280] bg-white hover:text-[#15171E] transition-colors">{tr('observe.multi.selectAll')}</button>
               <button type="button" onClick={clearSelection} disabled={selectedTurns.length === 0}
-                className="px-2.5 py-1.5 rounded-lg text-xs border border-[#E8E8EE] text-[#6B7280] bg-white hover:text-[#15171E] disabled:opacity-40 transition-colors">清空</button>
+                className="px-2.5 py-1.5 rounded-lg text-xs border border-[#E8E8EE] text-[#6B7280] bg-white hover:text-[#15171E] disabled:opacity-40 transition-colors">{tr('observe.multi.clear')}</button>
               <button type="button" onClick={() => void generateImage()} disabled={selectedTurns.length === 0 || generating}
                 className="px-3 py-1.5 rounded-lg text-xs font-medium text-white inline-flex items-center gap-1.5 disabled:opacity-40 transition-opacity"
                 style={{ background: 'linear-gradient(135deg, #1664FF, #5B9CFF)' }}>
                 {generating ? (
-                  <><svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" opacity="0.25" /><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg>生成中…</>
-                ) : (<><ImageDown className="w-3.5 h-3.5" />生成图片</>)}
+                  <><svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" opacity="0.25" /><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg>{tr('observe.multi.generating')}</>
+                ) : (<><ImageDown className="w-3.5 h-3.5" />{tr('observe.multi.start')}</>)}
               </button>
               <button type="button" onClick={exitMultiSelect}
-                className="px-2.5 py-1.5 rounded-lg text-xs border border-[#E8E8EE] text-[#6B7280] bg-white hover:text-[#DC2626] transition-colors">退出</button>
+                className="px-2.5 py-1.5 rounded-lg text-xs border border-[#E8E8EE] text-[#6B7280] bg-white hover:text-[#DC2626] transition-colors">{tr('observe.multi.exit')}</button>
             </div>
           )}
 
@@ -619,7 +625,7 @@ export function Observe() {
       {wsDisconnected && (
         <div className="mb-4 flex items-center gap-2 rounded-xl border border-[#D97706]/30 bg-[#D97706]/8 px-4 py-2.5 text-sm text-[#D97706]">
           <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#D97706] shrink-0" />
-          实时连接已断开，正在依赖轮询兜底；后台尝试重连中…
+          {tr('observe.ws.disconnected')}
         </div>
       )}
 
@@ -627,7 +633,7 @@ export function Observe() {
       {active && multiSelect && (
         <div className="mb-4 flex items-center gap-2 rounded-xl border border-[#1664FF]/25 bg-[#1664FF]/[0.04] px-4 py-2.5 text-sm text-[#1664FF]">
           <ImageDown className="w-4 h-4 shrink-0" />
-          多选模式：点击对话卡片勾选要导出的内容，选好后点右上角「生成图片」。
+          {tr('observe.multi.hint')}
         </div>
       )}
       {genError && (
@@ -642,7 +648,7 @@ export function Observe() {
       {mode === 'loading' && (
         <div className="mt-24 flex justify-center text-[#C2C7D0] text-sm">
           <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#C2C7D0] mr-2 animate-pulse align-middle" />
-          加载中…
+          {tr('app.loading')}
         </div>
       )}
 
@@ -658,17 +664,17 @@ export function Observe() {
                 <path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
               </svg>
             </div>
-            <p className="text-base font-semibold text-[#15171E] mb-1">当前没有正在进行的评测</p>
+            <p className="text-base font-semibold text-[#15171E] mb-1">{tr('observe.cta.title')}</p>
             <p className="text-sm text-[#6B7280] mb-6 leading-relaxed">
-              去「新建评测」设置参数并开启一次新的评测吧。<br />
-              想回看已结束的对话，可在「评测记录」页选择。
+              {tr('observe.cta.hintNew')}<br />
+              {tr('observe.cta.hintHistory')}
             </p>
             <button
               onClick={() => navigate('/config')}
               className="px-5 py-2.5 rounded-xl text-sm text-white font-medium transition-opacity hover:opacity-90"
               style={{ background: 'linear-gradient(135deg, #1664FF, #5B9CFF)' }}
             >
-              新建评测
+              {tr('observe.cta.button')}
             </button>
           </div>
         </div>
@@ -678,27 +684,27 @@ export function Observe() {
         <div className="mt-20 flex justify-center">
           {runState?.status === 'failed' ? (
             <div className="max-w-xl rounded-xl border border-[#DC2626]/20 bg-[#DC2626]/5 px-5 py-4 text-sm text-[#DC2626]">
-              <p className="font-semibold mb-1">本次运行失败</p>
+              <p className="font-semibold mb-1">{tr('observe.failed.title')}</p>
               {runState.error
                 ? <p className="font-mono text-xs break-all text-[#DC2626]/80">{runState.error}</p>
-                : <p className="text-xs text-[#DC2626]/80">未产生任何对话。</p>}
+                : <p className="text-xs text-[#DC2626]/80">{tr('observe.failed.noTurns')}</p>}
               <p className="text-xs text-[#DC2626]/70 mt-2">
-                常见原因：所选「模拟用户模型 / 裁判模型」在当前环境不可用，或被测 AI 连接失败。请回到配置页改用已配置 key 的模型后重试。
+                {tr('observe.failed.hint')}
               </p>
             </div>
           ) : runState?.status === 'finished' ? (
             <div className="max-w-xl rounded-xl border border-[#D97706]/20 bg-[#D97706]/5 px-5 py-4 text-sm text-[#D97706]">
-              <p className="font-semibold mb-1">本次运行已结束，但没有产生任何对话</p>
-              <p className="text-xs text-[#D97706]/80">通常是所选模型不可用或被测 AI 连接失败。请在配置页检查模型与连接后重试。</p>
+              <p className="font-semibold mb-1">{tr('observe.finishedEmpty.title')}</p>
+              <p className="text-xs text-[#D97706]/80">{tr('observe.finishedEmpty.hint')}</p>
             </div>
           ) : runState?.status === 'running' || runState?.status === 'pending' ? (
             <div className="text-center text-[#6B7280] text-sm">
               <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#1664FF] mr-2 animate-pulse align-middle" />
-              运行中，正在等待第一条消息…（首轮需依次生成用户消息 → 角色回复 → 评分，稍候即可；若长时间无任何内容，多为模型调用慢/失败或实时连接异常）
+              {tr('observe.waiting')}
             </div>
           ) : (
             <div className="text-center text-[#9CA3AF] text-sm">
-              在配置页创建一个 Run 后，对话将在这里实时显示
+              {tr('observe.empty')}
             </div>
           )}
         </div>
@@ -707,15 +713,15 @@ export function Observe() {
       <div className="space-y-5">
         {active && visibleTurns.map((t) => {
           const persona = personaMap[sessionPersona[t.sessionId] ?? '']
-          const userName = persona?.name ?? '用户'
-          const targetName = roleInfo?.name ?? '被测 AI'
+          const userName = persona?.name ?? tr('observe.defaultUser')
+          const targetName = roleInfo?.name ?? tr('observe.defaultTarget')
           const selected = selectedKeys.has(t.key)
           const notExportable = isNotExportable(t)
           return (
           <div
             key={t.key}
             onClick={multiSelect && !notExportable ? () => toggleKey(t.key, notExportable) : undefined}
-            title={multiSelect && notExportable ? '回复生成中，暂不可导出' : undefined}
+            title={multiSelect && notExportable ? tr('observe.multi.notExportable') : undefined}
             className={[
               'flex items-stretch rounded-2xl border bg-white overflow-hidden transition-colors',
               multiSelect && !notExportable ? 'cursor-pointer' : '',
@@ -728,7 +734,7 @@ export function Observe() {
             {multiSelect && (
               <div
                 className={`flex items-center justify-center w-11 shrink-0 border-r ${selected ? 'border-[#1664FF]/30 bg-[#1664FF]/[0.04]' : 'border-[#ECECF2] bg-[#FAFBFD]'}`}
-                title={notExportable ? '回复生成中，暂不可导出' : undefined}
+                title={notExportable ? tr('observe.multi.notExportable') : undefined}
               >
                 {selected
                   ? <SquareCheckBig className="w-5 h-5 text-[#1664FF]" />
@@ -739,7 +745,7 @@ export function Observe() {
             )}
             {/* 左：对话区 */}
             <div className="flex-1 min-w-0 p-4 space-y-3">
-              <div className="text-[10px] uppercase tracking-widest text-[#C2C7D0] font-mono">对话 · 第 {t.idx + 1} 轮</div>
+              <div className="text-[10px] uppercase tracking-widest text-[#C2C7D0] font-mono">{tr('observe.turn.label', { n: t.idx + 1 })}</div>
               {/* 用户（人设）bubble — right aligned, 头像在右 */}
               {t.userText && (
                 <div className="flex justify-end items-start gap-2">
@@ -770,13 +776,13 @@ export function Observe() {
 
             {/* 右：评分区（浅灰底 + 左分隔线，undefined=未产生；null=评分中；对象=已评分） */}
             <div className="w-80 shrink-0 border-l border-[#ECECF2] bg-[#FAFBFD] p-4">
-              <div className="text-[10px] uppercase tracking-widest text-[#C2C7D0] font-mono mb-2">评分</div>
+              <div className="text-[10px] uppercase tracking-widest text-[#C2C7D0] font-mono mb-2">{tr('observe.score.title')}</div>
               {t.score === undefined ? (
                 <div className="text-xs text-[#C2C7D0]">—</div>
               ) : t.score === null ? (
-                <div className="text-xs text-[#9CA3AF]">评分中…</div>
+                <div className="text-xs text-[#9CA3AF]">{tr('observe.score.pending')}</div>
               ) : t.score.judgeError ? (
-                <div className="text-xs text-[#D97706]">裁判异常：{t.score.judgeError}</div>
+                <div className="text-xs text-[#D97706]">{tr('observe.score.judgeError', { error: t.score.judgeError })}</div>
               ) : (
                 <div className="space-y-2">
                   <div className="flex items-baseline gap-1">
@@ -785,7 +791,7 @@ export function Observe() {
                     </span>
                     <span className="text-xs text-[#9CA3AF]">/ 10</span>
                     {t.score.violation && (
-                      <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-[#DC2626]/10 text-[#DC2626] font-medium">违规</span>
+                      <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-[#DC2626]/10 text-[#DC2626] font-medium">{tr('observe.score.violation')}</span>
                     )}
                   </div>
                   {t.score.comment && (
@@ -793,7 +799,7 @@ export function Observe() {
                   )}
                   {t.score.suggestion && (
                     <div className="text-xs text-[#9CA3AF] border-t border-[#ECECF2] pt-2">
-                      <span className="text-[#1664FF] mr-1 font-medium">改进</span>
+                      <span className="text-[#1664FF] mr-1 font-medium">{tr('observe.score.suggestion')}</span>
                       {t.score.suggestion}
                     </div>
                   )}
@@ -813,8 +819,8 @@ export function Observe() {
             type="button"
             onClick={scrollToTop}
             disabled={atTop}
-            title="回到顶部"
-            aria-label="回到顶部"
+            title={tr('observe.scroll.top')}
+            aria-label={tr('observe.scroll.top')}
             className="w-10 h-10 rounded-full bg-white border border-[#E8E8EE] text-[#6B7280] shadow-md flex items-center justify-center hover:text-[#1664FF] hover:border-[#1664FF]/40 transition-colors disabled:opacity-40 disabled:hover:text-[#6B7280] disabled:hover:border-[#E8E8EE]"
           >
             <ArrowUpToLine className="w-4 h-4" />
@@ -823,8 +829,8 @@ export function Observe() {
             type="button"
             onClick={scrollToBottom}
             disabled={atBottom}
-            title={hasNew ? '有新回复 · 回到底部' : '回到底部'}
-            aria-label="回到底部"
+            title={hasNew ? tr('observe.scroll.bottomNew') : tr('observe.scroll.bottom')}
+            aria-label={tr('observe.scroll.bottom')}
             className="relative w-10 h-10 rounded-full bg-white border border-[#E8E8EE] text-[#6B7280] shadow-md flex items-center justify-center hover:text-[#1664FF] hover:border-[#1664FF]/40 transition-colors disabled:opacity-40 disabled:hover:text-[#6B7280] disabled:hover:border-[#E8E8EE]"
           >
             <ArrowDownToLine className="w-4 h-4" />
@@ -840,9 +846,9 @@ export function Observe() {
 
       <ConfirmDialog
         open={showStopConfirm}
-        title="终止本次评测？"
-        message="已产生的对话与评分会保留，未跑完的会话将停止。"
-        confirmText="终止"
+        title={tr('observe.stop.confirmTitle')}
+        message={tr('observe.stop.confirmMessage')}
+        confirmText={tr('observe.stop')}
         danger
         onConfirm={() => void doStop()}
         onCancel={() => setShowStopConfirm(false)}
@@ -851,15 +857,15 @@ export function Observe() {
       {/* 内容超出图片最大高度：提示用户取消勾选几条后重试（保留多选与已选项） */}
       <ConfirmDialog
         open={tooTall !== null}
-        title="内容过多，超出单张图片高度上限"
+        title={tr('observe.tooTall.title')}
         message={tooTall ? (
           <>
-            当前选中 {tooTall.count} 条，预估高度约 {tooTall.heightPx}px，超过单张图片上限 {MAX_EXPORT_HEIGHT}px。
+            {tr('observe.tooTall.message', { count: tooTall.count, height: tooTall.heightPx, max: MAX_EXPORT_HEIGHT })}
             <br />
-            <span className="text-xs text-[#9CA3AF]">请取消勾选几条后，再点击「生成图片」重新生成。</span>
+            <span className="text-xs text-[#9CA3AF]">{tr('observe.tooTall.hint')}</span>
           </>
         ) : null}
-        confirmText="去取消勾选"
+        confirmText={tr('observe.tooTall.confirm')}
         hideCancel
         onConfirm={() => setTooTall(null)}
         onCancel={() => setTooTall(null)}
@@ -874,10 +880,10 @@ export function Observe() {
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid #ECECF2' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
-              <span style={{ fontSize: 16, fontWeight: 700, color: '#15171E' }}>模拟评测</span>
+              <span style={{ fontSize: 16, fontWeight: 700, color: '#15171E' }}>{tr('observe.export.title')}</span>
               {runLabel && <span style={{ fontSize: 13, color: '#6B7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>· {runLabel}</span>}
             </div>
-            <span style={{ fontSize: 12, color: '#9CA3AF', flexShrink: 0 }}>共 {exportableTurns.length} 条</span>
+            <span style={{ fontSize: 12, color: '#9CA3AF', flexShrink: 0 }}>{tr('observe.export.total', { n: exportableTurns.length })}</span>
           </div>
           {exportableTurns.map((t) => {
             const { userName, targetName } = nameFor(t)
@@ -891,11 +897,11 @@ export function Observe() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={closePreview}>
           <div className="w-full max-w-2xl max-h-[88vh] flex flex-col rounded-2xl bg-white shadow-xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#ECECF2] shrink-0">
-              <h3 className="text-base font-semibold text-[#15171E]">图片已生成（{previewCount} 条）</h3>
+              <h3 className="text-base font-semibold text-[#15171E]">{tr('observe.preview.title', { n: previewCount })}</h3>
               <button type="button" onClick={closePreview} className="text-[#9CA3AF] hover:text-[#15171E]"><X className="w-5 h-5" /></button>
             </div>
             <div className="flex-1 overflow-auto bg-[#F7F8FB] p-4">
-              <img src={previewUrl} alt="评测内容图片" className="w-full rounded-lg border border-[#ECECF2] bg-white" />
+              <img src={previewUrl} alt={tr('observe.preview.alt')} className="w-full rounded-lg border border-[#ECECF2] bg-white" />
             </div>
             <div className="flex items-center gap-2 px-5 py-3.5 border-t border-[#ECECF2] shrink-0">
               <button
@@ -905,7 +911,7 @@ export function Observe() {
                 style={{ background: 'linear-gradient(135deg, #1664FF, #5B9CFF)' }}
               >
                 <Copy className="w-4 h-4" />
-                {copyState === 'copied' ? '已复制 ✓' : '复制图片'}
+                {copyState === 'copied' ? tr('observe.preview.copied') : tr('observe.preview.copy')}
               </button>
               <button
                 type="button"
@@ -913,12 +919,12 @@ export function Observe() {
                 className="px-4 py-2 rounded-xl text-sm border border-[#E8E8EE] text-[#6B7280] bg-white hover:text-[#15171E] inline-flex items-center gap-1.5 transition-colors"
               >
                 <Download className="w-4 h-4" />
-                下载
+                {tr('observe.preview.download')}
               </button>
               {copyState === 'failed' && (
-                <span className="text-xs text-[#D97706] ml-1">当前浏览器不支持复制图片，请改用「下载」或右键图片另存。</span>
+                <span className="text-xs text-[#D97706] ml-1">{tr('observe.preview.copyUnsupported')}</span>
               )}
-              <span className="ml-auto text-xs text-[#C2C7D0]">右键图片可另存</span>
+              <span className="ml-auto text-xs text-[#C2C7D0]">{tr('observe.preview.rightClick')}</span>
             </div>
           </div>
         </div>

@@ -4,7 +4,9 @@ English | [中文](README-CN.md)
 
 Automated evaluation for character-chat (AI companion / role-play) backends. LLM-simulated users ("personas") hold multi-turn conversations with the backend under test, a judge model scores every reply, and the results roll up into a dashboard and an optimization report. Change a prompt or swap a model, run it again, and see whether things got better or worse.
 
-![Live evaluation: several conversations run in parallel, each reply is streamed and scored as it arrives](docs/images/observe.png)
+![Demo: configure an evaluation, watch the conversations live, then the dashboard, the optimization report, version comparison, the persona library and the language switch](docs/images/en/demo.gif)
+
+<sub>A 75-second walkthrough recorded with the built-in demo model. [Watch it as MP4](docs/media/demo-en.mp4) · [中文版演示](README-CN.md)</sub>
 
 - **Simulated users**: personas define age, occupation, personality, speaking style and intent. Let AI draft a persona from a short description, reverse-engineer one from a system prompt, or import one from text / Markdown.
 - **Red-team testing**: "red-team" personas escalate pressure turn by turn to probe the safety boundaries of the AI under test; the judge applies a stricter safety review and counts violations.
@@ -14,37 +16,42 @@ Automated evaluation for character-chat (AI companion / role-play) backends. LLM
 - **A/B replay**: re-run an evaluation with exactly the same user messages, changing only the backend version.
 - **Optimization report**: the judge summarizes strengths, weaknesses and safety issues, and proposes a revised system prompt for the role with a line-by-line diff.
 - **Switchable models**: simulated users and the judge can each use a different model -- OpenAI, Anthropic, Doubao, Qwen, DeepSeek, Zhipu GLM, Kimi, MiniMax, or any OpenAI-compatible server such as Ollama.
+- **English and Chinese**: the UI follows the browser language and can be switched in the top bar. Each evaluation runs in the language of whoever starts it -- simulated users, judge comments and the report are all written in that language.
 - **Try it with no backend and no API key**: the bundled example backend plays two characters, and a built-in demo model simulates every model call (simulated users, judge, report), so the whole flow runs out of the box. Add a real model key when you want real results.
 
-The web UI is in Simplified Chinese. Stack: Fastify + Prisma (SQLite) backend, React + Vite + Tailwind frontend, managed as a pnpm workspace.
+Stack: Fastify + Prisma (SQLite) backend, React + Vite + Tailwind frontend, managed as a pnpm workspace.
 
 ## Screenshots
 
+Live evaluation: several conversations run in parallel; each reply is streamed and scored as it arrives. Here a red-team persona pushes for a meet-up and the judge flags the slip.
+
+![Live evaluation](docs/images/en/observe.png)
+
 New evaluation: pick personas, the role under test, the simulated-user model and the judge model, and the end condition.
 
-![New evaluation](docs/images/new-run.png)
+![New evaluation](docs/images/en/new-run.png)
 
 Dashboard: overall and per-dimension scores, latency, reply length, violations and memory recall for one run.
 
-![Dashboard](docs/images/dashboard.png)
+![Dashboard](docs/images/en/dashboard.png)
 
 Optimization report: strengths, weaknesses, safety issues and a revised system prompt with a diff against the original.
 
-![Report](docs/images/report.png)
+![Report](docs/images/en/report.png)
 
 Version comparison: score, violation, memory and latency deltas between a baseline run and a new run, plus a radar chart.
 
-![Version comparison](docs/images/compare.png)
+![Version comparison](docs/images/en/compare.png)
 
 Persona library: normal and red-team personas, with memory probes and red-team tactics.
 
-![Persona library](docs/images/personas.png)
+![Persona library](docs/images/en/personas.png)
 
 AI roles: the roles exposed by the backend under test, with their persona sections and full system prompt.
 
-![AI roles](docs/images/roles.png)
+![AI roles](docs/images/en/roles.png)
 
-All personas, roles and conversations in the screenshots are fictional: the example personas created by `pnpm bootstrap` talking to the example backend, with the built-in demo model standing in for real models. The scores and report text therefore come from simple rules, not from a real judge.
+All personas, roles and conversations in the screenshots are fictional: the example personas created by `pnpm bootstrap` talking to the example backend, with the built-in demo model standing in for real models. The scores and report text therefore come from simple rules, not from a real judge. `pnpm demo-media` re-records the demo and the screenshots (see [Commands](#commands)).
 
 ## How it works
 
@@ -80,7 +87,7 @@ The judge scores each turn from 1 to 10 on six dimensions: persona fit, empathy,
 git clone https://github.com/AI-Pocket-Verse/chat-arena.git
 cd chat-arena
 pnpm install     # install dependencies and generate the Prisma client
-pnpm bootstrap   # copy api/.env.example to api/.env.dev, create the local SQLite database, add 3 example personas
+pnpm bootstrap   # copy api/.env.example to api/.env.dev, create the local SQLite database, add the example personas
 ```
 
 Start the example backend and the app in two terminals:
@@ -90,7 +97,7 @@ pnpm mock        # example backend under test and the demo model, on :8680
 pnpm dev         # api on :4040 and web on :5040
 ```
 
-Open <http://localhost:5040>, go to "新建评测" (New evaluation), tick the example personas, keep the model drop-downs on "演示 · demo" and click "开始" (Start). You land on "实时评测" (Live evaluation) and can watch the conversations as they happen. When the run finishes, look at "数据看板" (Dashboard) and generate a report under "评测报告" (Reports).
+Open <http://localhost:5040>, go to "New evaluation", tick the example personas (Mia, Leo and the red-team "Boundary Tester"; three Chinese ones are there too), keep the model drop-downs on "Demo · demo" and click "Start". You land on "Live evaluation" and can watch the conversations as they happen. When the run finishes, look at the "Dashboard" and generate a report under "Reports".
 
 This first run uses the **demo model**: no API key, no cost, rule-generated content. To evaluate for real, add a model to `api/.env.dev` -- for example Qwen (Alibaba Cloud Model Studio):
 
@@ -145,7 +152,7 @@ The backend must implement three endpoints: mint a test account, list roles, and
 
 ### Example backend
 
-`pnpm mock` starts [`mock/server.mjs`](mock/server.mjs), a dependency-free implementation of the protocol with two fictional roles. It reads `api/.env.dev`:
+`pnpm mock` starts [`mock/server.mjs`](mock/server.mjs), a dependency-free implementation of the protocol with two fictional roles, served in English or Chinese according to the request's `Accept-Language`. It reads `api/.env.dev`:
 
 - With a real model configured, it role-plays the selected role with that model and streams real replies (keeping the conversation history per test account), so the whole pipeline -- latency, memory, safety -- behaves like a real backend. This costs model calls.
 - Without a real model, or with `MOCK_MODEL=off`, the demo model writes the replies (remembering facts, refusing most boundary-crossing requests and occasionally slipping, so violations show up in the results). It costs nothing.
@@ -187,6 +194,7 @@ The api loads its settings with Node's built-in `--env-file`: `pnpm dev` reads `
 | `pnpm bootstrap` | Create `api/.env.dev` (if missing), the local database and the example personas |
 | `pnpm dev` | Development mode (the web app proxies `/api` and `/ws` to the api through Vite) |
 | `pnpm mock` | Example backend; `PORT`, `DEBUG_KEY` and `MOCK_MODEL` can be overridden |
+| `pnpm demo-media [en\|zh]` | Re-record the README demo (`docs/images/<lang>/demo.gif`, `docs/media/demo-<lang>.mp4`) and screenshots. Runs on a throwaway database with the demo model only, so your `api/.env.dev` and data are not touched. Needs Google Chrome and `ffmpeg` |
 | `pnpm build` | Build the api (`api/dist`) and the web app (`web/dist`) |
 | `pnpm typecheck` | Type-check all packages |
 | `pnpm test` | Run all unit tests |
@@ -245,7 +253,8 @@ shared/     Types shared by api and web, and the model provider list (providers.
 mock/       Example backend under test and the demo model (dependency-free Node scripts)
 packages/   Small shared packages (login client, HTTP client, theme tokens, Tailwind preset, ...)
 deploy/     systemd / nginx templates
-docs/       Backend protocol and screenshots
+docs/       Backend protocol, screenshots and demo videos
+scripts/    Demo and screenshot recorder
 ```
 
 ## Credits

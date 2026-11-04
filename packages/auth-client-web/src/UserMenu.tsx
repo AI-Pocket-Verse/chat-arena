@@ -58,6 +58,8 @@ export interface UserMenuProps {
    * `top-start` 改为向上展开 + 左对齐,两个问题一起解决。
    */
   placement?: 'bottom-end' | 'top-start'
+  /** 菜单文案（多语言时由调用方传入），缺省为中文 */
+  labels?: { settings?: string; logout?: string }
 }
 
 /** 方向 → 定位类名。抽出来是为了让上面那段注释有唯一的落点。 */
@@ -66,7 +68,7 @@ const PLACEMENT = {
   'top-start': 'left-0 bottom-full mb-2',
 } as const
 
-export function UserMenu({ onSettingsClick, items, onLoginClick, loginLabel = '登录', onLogout, subtitle, avatarOnly = false, placement = 'bottom-end' }: UserMenuProps) {
+export function UserMenu({ onSettingsClick, items, onLoginClick, loginLabel = '登录', onLogout, subtitle, avatarOnly = false, placement = 'bottom-end', labels }: UserMenuProps) {
   const { user, loading, isLocal, logout, loginDirect } = useAuth()
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -162,7 +164,7 @@ export function UserMenu({ onSettingsClick, items, onLoginClick, loginLabel = '�
             {onSettingsClick && (
               <MenuRow
                 icon={<GearIcon />}
-                label="设置"
+                label={labels?.settings ?? '设置'}
                 onClick={() => { setOpen(false); onSettingsClick() }}
               />
             )}
@@ -172,7 +174,7 @@ export function UserMenu({ onSettingsClick, items, onLoginClick, loginLabel = '�
             {!isLocal && (
               <MenuRow
                 icon={<LogoutIcon />}
-                label="退出登录"
+                label={labels?.logout ?? '退出登录'}
                 onClick={() => { setOpen(false); onLogout ? onLogout() : void logout() }}
                 className="text-red-500 hover:bg-red-50/60"
               />

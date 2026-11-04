@@ -1,12 +1,12 @@
 [
   { "id": "openai",    "label": "OpenAI",    "env": "OPENAI",    "baseUrl": "https://api.openai.com/v1" },
   { "id": "anthropic", "label": "Anthropic", "env": "ANTHROPIC", "baseUrl": "https://api.anthropic.com/v1/", "noTemperature": true, "noJsonMode": true },
-  { "id": "doubao",    "label": "豆包",      "env": "ARK",       "baseUrl": "https://ark.cn-beijing.volces.com/api/v3" },
-  { "id": "qwen",      "label": "千问",      "env": "QWEN",      "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1" },
+  { "id": "doubao",    "label": "豆包",      "labelEn": "Doubao", "env": "ARK",       "baseUrl": "https://ark.cn-beijing.volces.com/api/v3" },
+  { "id": "qwen",      "label": "千问",      "labelEn": "Qwen", "env": "QWEN",      "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1" },
   { "id": "deepseek",  "label": "DeepSeek",  "env": "DEEPSEEK",  "baseUrl": "https://api.deepseek.com" },
-  { "id": "zhipu",     "label": "智谱",      "env": "ZHIPU",     "baseUrl": "https://open.bigmodel.cn/api/paas/v4" },
+  { "id": "zhipu",     "label": "智谱",      "labelEn": "Zhipu", "env": "ZHIPU",     "baseUrl": "https://open.bigmodel.cn/api/paas/v4" },
   { "id": "kimi",      "label": "Kimi",      "env": "KIMI",      "baseUrl": "https://api.moonshot.cn/v1" },
   { "id": "minimax",   "label": "MiniMax",   "env": "MINIMAX",   "baseUrl": "https://api.minimaxi.com/v1" },
-  { "id": "custom",    "label": "自定义",    "env": "CUSTOM",    "baseUrl": "", "keyOptional": true },
-  { "id": "demo",      "label": "演示", "env": "DEMO", "baseUrl": "http://localhost:8680/v1", "keyOptional": true }
+  { "id": "custom",    "label": "自定义",    "labelEn": "Custom", "env": "CUSTOM",    "baseUrl": "", "keyOptional": true },
+  { "id": "demo",      "label": "演示", "labelEn": "Demo", "env": "DEMO", "baseUrl": "http://localhost:8680/v1", "keyOptional": true }
 ]

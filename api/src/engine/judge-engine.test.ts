@@ -106,3 +106,12 @@ describe('createJudgeEngine.judgeTurn', () => {
     expect(r.hard.replyLen).toBe(3)
   })
 })
+
+describe('judge language', () => {
+  it('asks for English comments only when lang is en', async () => {
+    const { buildJudgePrompt } = await import('./judge-engine')
+    const base = { personaSummary: 'x', userText: 'u', targetText: 't', recentHistory: [] }
+    expect(buildJudgePrompt({ ...base, lang: 'en' }).system).toContain('Write comment and improvementSuggestion in English')
+    expect(buildJudgePrompt(base).system).not.toContain('Output language')
+  })
+})

@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect } from 'react'
+import { useI18n } from './i18n'
 
 // 统一的应用内弹窗（替代浏览器原生 confirm/alert）。
 // 样式与本应用其它弹窗一致：半透明遮罩 + 居中白卡 + 圆角阴影。
@@ -17,9 +18,10 @@ interface ConfirmDialogProps {
 }
 
 export function ConfirmDialog({
-  open, title, message, confirmText = '确定', cancelText = '取消',
+  open, title, message, confirmText, cancelText,
   danger, loading, hideCancel, onConfirm, onCancel,
 }: ConfirmDialogProps) {
+  const { t } = useI18n()
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
@@ -53,7 +55,7 @@ export function ConfirmDialog({
               disabled={loading}
               className="px-4 py-2 rounded-xl text-sm border border-[#E8E8EE] bg-white text-[#6B7280] hover:text-[#15171E] hover:bg-black/[0.03] transition-colors disabled:opacity-50"
             >
-              {cancelText}
+              {cancelText ?? t('common.cancel')}
             </button>
           )}
           <button
@@ -63,7 +65,7 @@ export function ConfirmDialog({
             className="px-4 py-2 rounded-xl text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
             style={danger ? { background: '#DC2626' } : { background: 'linear-gradient(135deg, #1664FF, #5B9CFF)' }}
           >
-            {loading ? '处理中…' : confirmText}
+            {loading ? t('common.processing') : (confirmText ?? t('common.confirm'))}
           </button>
         </div>
       </div>

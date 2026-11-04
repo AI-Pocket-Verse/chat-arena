@@ -1,4 +1,5 @@
 import type { TargetChatResult, TargetRole, TargetRolePromptPersona } from '../types'
+import { acceptLanguage, type Lang } from '../i18n'
 import { TargetChatAccumulator, classifyTargetEvent, splitSseEvents } from './target-sse'
 
 export interface TargetClientConfig {
@@ -6,6 +7,8 @@ export interface TargetClientConfig {
   debugKey: string
   /** 额外请求头，每个请求都带上（如被测后端要求的客户端版本头） */
   headers?: Record<string, string>
+  /** 评测语言：以 Accept-Language 告诉被测后端，便于返回对应语言的角色资料与回复。TARGET_HEADERS 里写了同名头时以它为准 */
+  lang?: Lang
   fetchImpl?: typeof fetch
   now?: () => number
   /** Request timeout in ms for generateDebugToken and chat. Defaults to 60000. */
@@ -80,7 +83,7 @@ export function createTargetClient(cfg: TargetClientConfig): TargetClient {
   const now = cfg.now ?? (() => Date.now())
   const base = cfg.baseUrl.replace(/\/+$/, '')
   const timeoutMs = cfg.timeoutMs ?? 60_000
-  const extra = cfg.headers ?? {}
+  const extra = { ...(cfg.lang ? { 'Accept-Language': acceptLanguage(cfg.lang) } : {}), ...cfg.headers }
 
   return {
     async generateDebugToken(opts = {}) {

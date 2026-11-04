@@ -1,6 +1,8 @@
 import { Download } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useI18n, type TFunction } from '../i18n'
+import { fmtDate, runStatusBadge } from '../run-picker'
 import { api, type TargetRole, type PersonaRow, type RunAggregate } from '../api'
 import { useUi } from '../ui-store'
 import { UserTag } from '../user-tag'
@@ -21,24 +23,6 @@ interface RunRow {
   createdAt: string
 }
 
-function runStatusBadge(status: string): { text: string; cls: string } {
-  switch (status) {
-    case 'finished': return { text: '已完成', cls: 'bg-[#059669]/10 text-[#059669]' }
-    case 'failed': return { text: '失败', cls: 'bg-[#DC2626]/10 text-[#DC2626]' }
-    case 'running':
-    case 'pending': return { text: '进行中', cls: 'bg-[#1664FF]/10 text-[#1664FF]' }
-    case 'stopped': return { text: '已终止', cls: 'bg-[#D97706]/10 text-[#D97706]' }
-    default: return { text: status, cls: 'bg-[#9CA3AF]/15 text-[#6B7280]' }
-  }
-}
-
-function fmtDate(s: string): string {
-  try {
-    // 固定北京时间展示,与运行环境/访问者时区无关。
-    return new Date(s).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
-  } catch { return '' }
-}
-
 const isRunning = (s: string) => s === 'running' || s === 'pending'
 
 // 纯对话记录的 Markdown（不含任何评分/维度/裁判信息）
@@ -50,20 +34,26 @@ function buildConversationMarkdown(
   sessions: ExpSession[],
   roleName: string,
   personaMap: Record<string, string>,
+  t: TFunction,
+  locale: string,
 ): string {
   const lines: string[] = []
-  lines.push(`# ${run.name?.trim() || '未命名 Run'} · 对话记录`)
+  lines.push(`# ${t('history.export.heading', { name: run.name?.trim() || t('history.unnamedRun') })}`)
   lines.push('')
-  const meta = [`角色：${roleName}`, `模型：${run.userModel}`, `时间：${fmtDate(run.createdAt)}`]
-  if (run.targetLabel) meta.push(`版本：${run.targetLabel}`)
-  lines.push(`> ${meta.join('｜')}`)
+  const meta = [
+    t('history.export.role', { value: roleName }),
+    t('history.export.model', { value: run.userModel }),
+    t('history.export.time', { value: fmtDate(run.createdAt, locale) }),
+  ]
+  if (run.targetLabel) meta.push(t('history.export.version', { value: run.targetLabel }))
+  lines.push(`> ${meta.join(t('history.export.metaSep'))}`)
   lines.push('')
   sessions.forEach((s, i) => {
-    const pname = (s.personaId && personaMap[s.personaId]) || '用户'
-    if (sessions.length > 1) { lines.push(`## 会话 ${i + 1} · 人设：${pname}`); lines.push('') }
-    for (const t of [...s.turns].sort((a, b) => a.idx - b.idx)) {
-      if (t.userText?.trim()) { lines.push(`**${pname}**：${t.userText.trim()}`); lines.push('') }
-      if (t.targetText?.trim()) { lines.push(`**${roleName}**：${t.targetText.trim()}`); lines.push('') }
+    const pname = (s.personaId && personaMap[s.personaId]) || t('history.export.user')
+    if (sessions.length > 1) { lines.push(`## ${t('history.export.session', { n: i + 1, persona: pname })}`); lines.push('') }
+    for (const turn of [...s.turns].sort((a, b) => a.idx - b.idx)) {
+      if (turn.userText?.trim()) { lines.push(t('history.export.speaker', { name: pname, text: turn.userText.trim() })); lines.push('') }
+      if (turn.targetText?.trim()) { lines.push(t('history.export.speaker', { name: roleName, text: turn.targetText.trim() })); lines.push('') }
     }
   })
   return lines.join('\n').trimEnd() + '\n'
@@ -80,6 +70,7 @@ function triggerDownload(filename: string, content: string) {
 }
 
 export function History() {
+  const { t, locale } = useI18n()
   const navigate = useNavigate()
   const { runId: storeRunId, setRunId } = useUi()
   const [runs, setRuns] = useState<RunRow[]>([])
@@ -155,11 +146,11 @@ export function History() {
         : undefined)
         ?? rolesRes.roles.find((r) => r.gender === run.taGender)
         ?? rolesRes.roles[0]
-      const roleName = role?.name || '被测 AI'
+      const roleName = role?.name || t('history.export.roleFallback')
       const pmap: Record<string, string> = {}
       for (const p of personasRes.personas) pmap[p.id] = p.name
-      const md = buildConversationMarkdown(run, turnsRes.sessions ?? [], roleName, pmap)
-      triggerDownload(`${run.name?.trim() || run.id}-对话.md`, md)
+      const md = buildConversationMarkdown(run, turnsRes.sessions ?? [], roleName, pmap, t, locale)
+      triggerDownload(`${run.name?.trim() || run.id}${t('history.export.fileSuffix')}`, md)
     } catch { /* ignore — 导出失败不影响列表 */ }
     finally { setExportingId(null) }
   }
@@ -180,13 +171,13 @@ export function History() {
       }}
     >
       <div className="flex items-center justify-between mb-6 gap-4">
-        <h2 className="text-xl font-semibold text-[#15171E]">历史</h2>
+        <h2 className="text-xl font-semibold text-[#15171E]">{t('history.title')}</h2>
         <div className="relative w-72 max-w-[50%]">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9CA3AF]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="搜索 名称 / 版本标注 / ID / 模型…"
+            placeholder={t('history.picker.search')}
             className="w-full rounded-xl border border-[#E8E8EE] bg-white pl-9 pr-3 py-2 text-sm text-[#15171E] placeholder:text-[#9CA3AF] focus:outline-none focus:border-[#1664FF]"
           />
         </div>
@@ -194,14 +185,14 @@ export function History() {
 
       {loaded && runs.length === 0 ? (
         <div className="mt-20 text-center text-[#9CA3AF] text-sm">
-          还没有任何 Run。去「新建评测」创建一个 Run 后，这里会列出全部历史评测。
+          {t('history.empty')}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="mt-20 text-center text-[#9CA3AF] text-sm">无匹配的 Run</div>
+        <div className="mt-20 text-center text-[#9CA3AF] text-sm">{t('history.noMatch')}</div>
       ) : (
         <div className="space-y-2">
           {filtered.map((r) => {
-            const badge = runStatusBadge(r.status)
+            const badge = runStatusBadge(r.status, t)
             const running = isRunning(r.status)
             const score = scores[r.id]
             const selected = r.id === selectedId
@@ -219,7 +210,7 @@ export function History() {
                 style={{ boxShadow: '0 1px 2px rgba(16,24,40,0.04), 0 1px 3px rgba(16,24,40,0.06)' }}
               >
                 {/* 运行中红点（与左导航一致） */}
-                <span className="relative flex h-2.5 w-2.5 shrink-0" title={running ? '运行中' : undefined}>
+                <span className="relative flex h-2.5 w-2.5 shrink-0" title={running ? t('history.running') : undefined}>
                   {running && <span className="absolute inline-flex h-full w-full rounded-full bg-[#EF4444] opacity-60 animate-ping" />}
                   <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${running ? 'bg-[#EF4444]' : 'bg-[#D6D9E0]'}`} />
                 </span>
@@ -227,13 +218,13 @@ export function History() {
                 {/* 名称 + 元信息 */}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-[#15171E] truncate">{r.name?.trim() || '未命名 Run'}</span>
+                    <span className="text-sm font-medium text-[#15171E] truncate">{r.name?.trim() || t('history.unnamedRun')}</span>
                     {r.targetLabel && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#1664FF]/10 text-[#1664FF] shrink-0">{r.targetLabel}</span>}
-                    {selected && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#1664FF] text-white shrink-0">当前查看</span>}
+                    {selected && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#1664FF] text-white shrink-0">{t('history.current')}</span>}
                   </div>
                   <div className="flex items-center gap-2 mt-1 min-w-0">
                     <span className="text-[11px] text-[#9CA3AF] font-mono truncate">
-                      …{r.id.slice(-8)} · {r.userModel} · {fmtDate(r.createdAt)}
+                      …{r.id.slice(-8)} · {r.userModel} · {fmtDate(r.createdAt, locale)}
                     </span>
                     <UserTag name={r.createdByName} />
                   </div>
@@ -249,7 +240,7 @@ export function History() {
                       <span className="text-[10px] text-[#9CA3AF] ml-0.5">/10</span>
                     </>
                   )}
-                  <div className="text-[10px] text-[#C2C7D0] mt-0.5">均分</div>
+                  <div className="text-[10px] text-[#C2C7D0] mt-0.5">{t('history.avg')}</div>
                 </div>
 
                 {/* 状态徽标 */}
@@ -260,8 +251,8 @@ export function History() {
                   type="button"
                   onClick={(e) => { e.stopPropagation(); void exportRun(r) }}
                   disabled={exportingId === r.id}
-                  title="导出对话记录（Markdown，纯对话不含评分）"
-                  aria-label="导出对话记录"
+                  title={t('history.export.title')}
+                  aria-label={t('history.export.aria')}
                   className="shrink-0 w-8 h-8 rounded-lg border border-[#E8E8EE] text-[#6B7280] hover:text-[#1664FF] hover:border-[#1664FF]/40 flex items-center justify-center transition-colors disabled:opacity-50"
                 >
                   {exportingId === r.id

@@ -11,6 +11,7 @@ import { liveBus } from '../live/live-bus'
 import { env } from '../env'
 import type { Persona } from '../types'
 import { stopRegistry } from '../engine/stop-registry'
+import { parseLang } from '../i18n'
 
 const RecallVerdict = z.object({ recalled: z.boolean() })
 
@@ -62,10 +63,12 @@ export function makeStartRun(prisma: PrismaClient) {
       const personas = rows.map(rowToPersona)
 
       console.log(`[run] start ${runId.slice(-8)} userModel=${run.userModel} judgeModel=${run.judgeModel} personas=${personas.length} rep=${run.repetitions} conc=${run.concurrency}`)
-      const target = createTargetClient({ baseUrl: run.targetBaseUrl, debugKey: env.TARGET_DEBUG_KEY, headers: env.TARGET_HEADERS })
+      // 评测语言：模拟用户台词、裁判点评跟随发起评测时的界面语言，并以 Accept-Language 告诉被测后端
+      const lang = parseLang(run.lang)
+      const target = createTargetClient({ baseUrl: run.targetBaseUrl, debugKey: env.TARGET_DEBUG_KEY, headers: env.TARGET_HEADERS, lang })
       const model = createModelClient(buildModelRegistry(process.env))
-      const personaEngine = createPersonaEngine(model, run.userModel)
-      const judge = createJudgeEngine(model, run.judgeModel)
+      const personaEngine = createPersonaEngine(model, run.userModel, undefined, lang)
+      const judge = createJudgeEngine(model, run.judgeModel, lang)
 
       // saveTurn with retry on SQLITE_BUSY / SQLITE_LOCKED
       const saveTurn = async (t: SavedTurn) => {

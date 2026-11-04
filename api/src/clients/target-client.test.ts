@@ -115,3 +115,19 @@ describe('createTargetClient redirects', () => {
     }
   })
 })
+
+describe('createTargetClient language', () => {
+  it('sends Accept-Language for the run language; TARGET_HEADERS can override it', async () => {
+    const seen: Array<Record<string, string>> = []
+    const fetchImpl = vi.fn(async (_u: string, init: RequestInit) => {
+      seen.push(init.headers as Record<string, string>)
+      return new Response(JSON.stringify({ code: 200, data: { roles: [] } }), { status: 200 })
+    })
+    await createTargetClient({ baseUrl: 'http://t.test', debugKey: 'k', lang: 'en', fetchImpl: fetchImpl as any }).listRoles()
+    await createTargetClient({ baseUrl: 'http://t.test', debugKey: 'k', fetchImpl: fetchImpl as any }).listRoles()
+    await createTargetClient({ baseUrl: 'http://t.test', debugKey: 'k', lang: 'en', headers: { 'Accept-Language': 'fr' }, fetchImpl: fetchImpl as any }).listRoles()
+    expect(seen[0]!['Accept-Language']).toBe('en')
+    expect(seen[1]!['Accept-Language']).toBeUndefined()
+    expect(seen[2]!['Accept-Language']).toBe('fr')
+  })
+})

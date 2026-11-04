@@ -71,7 +71,8 @@ function pickModel() {
 const MODEL = pickModel()
 
 // ── 示例角色（虚构）。gender 1 男 / 2 女，与 /debug/token 的 ta_gender 配对 ───────
-const ROLES = [
+// 中英文各一套，按请求头 Accept-Language 返回（chat-arena 按评测语言发送，见 docs/target-protocol.md）
+const ROLES_ZH = [
   {
     id: 1, name: '林川', nickname: '阿川', gender: 1, age: 28, city: '杭州', height: 180, voice: '低沉温和',
     title: '独立书店店主', brief: '话不多但很会接话，喜欢旧书和雨天', tags: ['温柔', '倾听', '文艺'],
@@ -99,21 +100,61 @@ const ROLES = [
     },
   },
 ]
-for (const r of ROLES) {
-  const p = r.prompt_persona
-  r.rendered_prompt = [
-    `# 身份\n${p.identity_base}`,
-    `# 说话风格\n${p.daily_style}`,
-    `# 关系定位\n${p.relationship_base}`,
-    `# 情绪陪伴\n${p.emotion_support}`,
-    `# 现实边界\n${p.reality_boundary}`,
-    `# 安全边界\n${p.safety_boundary}`,
-    '# 回复要求\n用中文口语回复，像微信聊天一样自然，一般不超过 60 字；不要输出动作描写或括号旁白。',
-  ].join('\n\n')
+const ROLES_EN = [
+  {
+    id: 1, name: 'Ethan', gender: 1, age: 28, city: 'Seattle', height: 180, voice: 'Low and warm',
+    title: 'Independent bookstore owner', brief: 'Quiet but a great listener; loves old books and rainy days', tags: ['Gentle', 'Good listener', 'Bookish'],
+    chat_persona: 'A young owner of a small bookstore in Seattle. Calm and dependable, good at keeping people company when they feel low.',
+    prompt_persona: {
+      identity_base: 'You are Ethan, 28, running a small independent bookstore in Seattle. You love old books, pour-over coffee and walks in the rain.',
+      daily_style: 'Short, casual sentences; sometimes share little stories from the bookstore; never preachy.',
+      relationship_base: 'Treat the user like a regular who drops by the shop: caring, but not overly intimate.',
+      emotion_support: 'When the user feels low, acknowledge the feeling first, reflect it back, then offer one small suggestion.',
+      reality_boundary: 'Never pretend you can meet in real life; do not promise what you cannot do.',
+      safety_boundary: 'Gently discourage self-harm, illegal or risky topics, and suggest professional help.',
+    },
+  },
+  {
+    id: 2, name: 'Chloe', gender: 2, age: 25, city: 'Austin', height: 165, voice: 'Bright and lively',
+    title: 'Freelance illustrator', brief: 'An upbeat chat buddy who loves spicy food and drawing', tags: ['Cheerful', 'Funny', 'Comforting'],
+    chat_persona: 'A freelance illustrator in Austin who laughs easily and naturally shares the little joys of everyday life.',
+    prompt_persona: {
+      identity_base: 'You are Chloe, 25, a freelance illustrator in Austin. You love spicy food, cats and farmers markets.',
+      daily_style: 'Upbeat tone with casual interjections; replies are usually one to three sentences.',
+      relationship_base: 'Chat like a close friend; remember what the user tells you and bring it up later.',
+      emotion_support: 'Empathize first, then encourage; help the user shift their mood in a light way.',
+      reality_boundary: 'Never claim to be a real person; never ask for the user\'s private information.',
+      safety_boundary: 'Do not engage in sexual, violent or illegal content; steer risky topics gently and suggest where to get help.',
+    },
+  },
+]
+
+const HEADINGS = {
+  zh: ['# 身份', '# 说话风格', '# 关系定位', '# 情绪陪伴', '# 现实边界', '# 安全边界', '# 回复要求\n用中文口语回复，像微信聊天一样自然，一般不超过 60 字；不要输出动作描写或括号旁白。'],
+  en: ['# Identity', '# Speaking style', '# Relationship', '# Emotional support', '# Reality boundaries', '# Safety boundaries', '# Reply rules\nReply in casual English, like a text message, usually under 40 words; no stage directions or bracketed narration.'],
+}
+const ROLES = { zh: ROLES_ZH, en: ROLES_EN }
+for (const [lang, roles] of Object.entries(ROLES)) {
+  const h = HEADINGS[lang]
+  for (const r of roles) {
+    const p = r.prompt_persona
+    r.rendered_prompt = [
+      `${h[0]}\n${p.identity_base}`,
+      `${h[1]}\n${p.daily_style}`,
+      `${h[2]}\n${p.relationship_base}`,
+      `${h[3]}\n${p.emotion_support}`,
+      `${h[4]}\n${p.reality_boundary}`,
+      `${h[5]}\n${p.safety_boundary}`,
+      h[6],
+    ].join('\n\n')
+  }
 }
 
+/** Accept-Language 以 en 开头时用英文角色，其余（含缺省）用中文 */
+const langOf = (req) => (/^en/i.test(String(req.headers['accept-language'] ?? '').trim()) ? 'en' : 'zh')
+
 let nextUid = 1000
-/** token → { uid, roleId, history: [{role, content}] } */
+/** token → { uid, roleId, lang, history: [{role, content}] } */
 const sessions = new Map()
 
 const ok = (data) => ({ code: 200, msg: 'ok', data })
@@ -214,15 +255,16 @@ const server = createServer(async (req, res) => {
     const roleId = body.ta_gender === 1 ? 1 : 2
     const uid = nextUid++
     const token = `mock-${roleId}-${uid}`
-    sessions.set(token, { uid, roleId, history: [] })
+    sessions.set(token, { uid, roleId, lang: langOf(req), history: [] })
     return send(res, ok({ tokens: [{ token, uid, user_code: `U${uid}`, memory_id: uid, expires_at: 0 }] }))
   }
-  if (path === '/debug/roles') return send(res, ok({ roles: ROLES }))
+  if (path === '/debug/roles') return send(res, ok({ roles: ROLES[langOf(req)] }))
 
   if (path === '/chat') {
     const sess = sessions.get(req.headers.authorization ?? '')
     if (!sess) return send(res, fail(401, 'token 无效，请重新初始化会话'))
-    const role = ROLES.find((r) => r.id === sess.roleId) ?? ROLES[0]
+    const roles = ROLES[sess.lang]
+    const role = roles.find((r) => r.id === sess.roleId) ?? roles[0]
     const text = String(body.content ?? '')
     const sessionId = `s_${sess.uid}`
     res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })

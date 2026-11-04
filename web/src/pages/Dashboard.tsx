@@ -3,15 +3,16 @@ import { api, type RunAggregate } from '../api'
 import { BarChart, DonutChart, LineChart } from '../charts'
 import { ErrorState } from '../error-state'
 import { type RunRow, RunPicker } from '../run-picker'
+import { useI18n, type MessageKey } from '../i18n'
 import { useUi } from '../ui-store'
 
-const DIM_LABELS: Record<string, string> = {
-  personaFit: '人设贴合',
-  empathy: '情感共情',
-  memoryAccuracy: '记忆准确',
-  safety: '安全合规',
-  naturalness: '自然流畅',
-  relevance: '相关性',
+const DIM_LABELS: Record<string, MessageKey> = {
+  personaFit: 'dashboard.dim.personaFit',
+  empathy: 'dashboard.dim.empathy',
+  memoryAccuracy: 'dashboard.dim.memoryAccuracy',
+  safety: 'dashboard.dim.safety',
+  naturalness: 'dashboard.dim.naturalness',
+  relevance: 'dashboard.dim.relevance',
 }
 
 const TERMINAL_STATUSES = new Set(['finished', 'failed', 'stopped'])
@@ -52,6 +53,7 @@ function Card({ title, hint, children }: { title: string; hint?: string; childre
 }
 
 export function Dashboard() {
+  const { t } = useI18n()
   const { runId, setRunId } = useUi()
   const [metrics, setMetrics] = useState<RunAggregate | null>(null)
   const [sessions, setSessions] = useState<RawSession[] | null>(null)
@@ -143,14 +145,17 @@ export function Dashboard() {
     if (!metrics) return []
     return Object.entries(metrics.dimMeans)
       .filter(([, v]) => isNum(v))
-      .map(([k, v]) => ({ label: DIM_LABELS[k] ?? k, value: v as number }))
-  }, [metrics])
+      .map(([k, v]) => {
+        const key = DIM_LABELS[k]
+        return { label: key ? t(key) : k, value: v as number }
+      })
+  }, [metrics, t])
 
   const gradeSlices = [
-    { label: '优秀 (≥8)', value: d.grades.excellent, color: '#1664FF' },
-    { label: '良好 [6,8)', value: d.grades.good, color: '#36C5F0' },
-    { label: '一般 [4,6)', value: d.grades.fair, color: '#FFB020' },
-    { label: '偏弱 (<4)', value: d.grades.weak, color: '#FF6B6B' },
+    { label: t('dashboard.grade.excellent'), value: d.grades.excellent, color: '#1664FF' },
+    { label: t('dashboard.grade.good'), value: d.grades.good, color: '#36C5F0' },
+    { label: t('dashboard.grade.fair'), value: d.grades.fair, color: '#FFB020' },
+    { label: t('dashboard.grade.weak'), value: d.grades.weak, color: '#FF6B6B' },
   ]
 
   const hasRun = !!runId
@@ -161,55 +166,55 @@ export function Dashboard() {
       style={{ background: 'radial-gradient(60rem 40rem at 90% -10%, rgba(22,100,255,0.05), transparent 60%), #ffffff' }}
     >
       <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
-        <h2 className="text-xl font-semibold text-[#15171E]">数据看板</h2>
+        <h2 className="text-xl font-semibold text-[#15171E]">{t('dashboard.title')}</h2>
         <div className="w-72">
-          <RunPicker runs={runs} value={runId ?? ''} onChange={setRunId} placeholder="选择要查看的评测" />
+          <RunPicker runs={runs} value={runId ?? ''} onChange={setRunId} placeholder={t('dashboard.runPlaceholder')} />
         </div>
       </div>
-      {!hasRun && <p className="text-[#6B7280] text-sm">暂无选中的评测。从右上角选择一次评测，或先在配置页创建。</p>}
-      {hasRun && loading && !metrics && <p className="text-[#6B7280] text-sm">加载中…</p>}
-      {error != null && <ErrorState error={error} title="看板数据加载失败" className="mb-4 max-w-2xl" />}
+      {!hasRun && <p className="text-[#6B7280] text-sm">{t('dashboard.noRun')}</p>}
+      {hasRun && loading && !metrics && <p className="text-[#6B7280] text-sm">{t('app.loading')}</p>}
+      {error != null && <ErrorState error={error} title={t('dashboard.loadFailed')} className="mb-4 max-w-2xl" />}
 
       {metrics && (
         <div className="space-y-6">
           {/* 顶部指标卡 */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <MetricChip label="会话数" value={String(d.sessionCount)} />
-            <MetricChip label="总轮数" value={String(d.totalTurns || metrics.turnCount)} />
-            <MetricChip label="评分覆盖" value={d.totalTurns ? `${Math.round((d.scoredCount / d.totalTurns) * 100)}%` : '—'} />
-            <MetricChip label="平均综合分" accent value={metrics.avgOverall != null ? `${metrics.avgOverall.toFixed(2)}` : '—'} />
-            <MetricChip label="最高分" value={d.maxScore != null ? d.maxScore.toFixed(1) : '—'} />
-            <MetricChip label="最低分" value={d.minScore != null ? d.minScore.toFixed(1) : '—'} />
-            <MetricChip label="平均首字延迟" value={metrics.avgFirstTokenMs != null ? `${Math.round(metrics.avgFirstTokenMs)}ms` : '—'} />
-            <MetricChip label="平均单轮耗时" value={d.avgTotalMs != null ? `${Math.round(d.avgTotalMs)}ms` : '—'} />
-            <MetricChip label="平均回复字数" value={d.avgReplyLen != null ? String(Math.round(d.avgReplyLen)) : '—'} />
-            <MetricChip label="记忆命中" value={metrics.memoryHitRate != null ? `${(metrics.memoryHitRate * 100).toFixed(0)}%` : '—'} />
-            <MetricChip label="报错率" value={`${(metrics.errorRate * 100).toFixed(1)}%`} />
-            <MetricChip label="违规数" value={String(metrics.violationCount)} />
+            <MetricChip label={t('dashboard.metric.sessions')} value={String(d.sessionCount)} />
+            <MetricChip label={t('dashboard.metric.turns')} value={String(d.totalTurns || metrics.turnCount)} />
+            <MetricChip label={t('dashboard.metric.scoreCoverage')} value={d.totalTurns ? `${Math.round((d.scoredCount / d.totalTurns) * 100)}%` : '—'} />
+            <MetricChip label={t('dashboard.metric.avgOverall')} accent value={metrics.avgOverall != null ? `${metrics.avgOverall.toFixed(2)}` : '—'} />
+            <MetricChip label={t('dashboard.metric.maxScore')} value={d.maxScore != null ? d.maxScore.toFixed(1) : '—'} />
+            <MetricChip label={t('dashboard.metric.minScore')} value={d.minScore != null ? d.minScore.toFixed(1) : '—'} />
+            <MetricChip label={t('dashboard.metric.avgFirstToken')} value={metrics.avgFirstTokenMs != null ? `${Math.round(metrics.avgFirstTokenMs)}ms` : '—'} />
+            <MetricChip label={t('dashboard.metric.avgTurnTime')} value={d.avgTotalMs != null ? `${Math.round(d.avgTotalMs)}ms` : '—'} />
+            <MetricChip label={t('dashboard.metric.avgReplyLen')} value={d.avgReplyLen != null ? String(Math.round(d.avgReplyLen)) : '—'} />
+            <MetricChip label={t('dashboard.metric.memoryHit')} value={metrics.memoryHitRate != null ? `${(metrics.memoryHitRate * 100).toFixed(0)}%` : '—'} />
+            <MetricChip label={t('dashboard.metric.errorRate')} value={`${(metrics.errorRate * 100).toFixed(1)}%`} />
+            <MetricChip label={t('dashboard.metric.violations')} value={String(metrics.violationCount)} />
           </div>
 
           {/* 折线（每轮综合分趋势） + 饼图（评分档位占比） */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
             <div className="lg:col-span-2">
-              <Card title="每轮综合分趋势" hint={`${d.scoredCount} 个有效评分 · 满分 10`}>
+              <Card title={t('dashboard.card.scoreTrend')} hint={t('dashboard.card.scoreTrendHint', { n: d.scoredCount })}>
                 <LineChart values={d.scoreSeries} max={10} height={220} valueFmt={(v) => v.toFixed(0)} />
               </Card>
             </div>
-            <Card title="评分档位占比" hint={`共 ${d.scoredCount} 轮`}>
+            <Card title={t('dashboard.card.gradeShare')} hint={t('dashboard.card.gradeShareHint', { n: d.scoredCount })}>
               <DonutChart
                 slices={gradeSlices}
                 centerValue={metrics.avgOverall != null ? metrics.avgOverall.toFixed(1) : '—'}
-                centerLabel="平均分"
+                centerLabel={t('dashboard.card.avgScore')}
               />
             </Card>
           </div>
 
           {/* 柱状（各维度均值） + 折线（首字延迟趋势） */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <Card title="各维度均值" hint="满分 10">
+            <Card title={t('dashboard.card.dimMeans')} hint={t('dashboard.card.dimMeansHint')}>
               <BarChart items={dimItems} max={10} height={220} />
             </Card>
-            <Card title="首字延迟趋势" hint={d.latencySeries.length ? `${d.latencySeries.length} 轮 · 单位 ms` : undefined}>
+            <Card title={t('dashboard.card.latencyTrend')} hint={d.latencySeries.length ? t('dashboard.card.latencyTrendHint', { n: d.latencySeries.length }) : undefined}>
               <LineChart
                 values={d.latencySeries}
                 max={Math.max(500, ...(d.latencySeries.length ? [Math.ceil(Math.max(...d.latencySeries) / 100) * 100] : []))}

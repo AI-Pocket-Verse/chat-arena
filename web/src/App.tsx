@@ -11,9 +11,11 @@ import { Personas } from './pages/Personas'
 import { Reports } from './pages/Reports'
 import { Roles } from './pages/Roles'
 import { useUi } from './ui-store'
+import { LanguageSwitch, useI18n, type MessageKey } from './i18n'
 
 // 头像弹窗的身份信息行：user_id / open_id 各一行、单行截断、点击复制。
 function CopyId({ label, value }: { label: string; value: string | null }) {
+  const { t } = useI18n()
   const [copied, setCopied] = useState(false)
   if (!value) return null
   const copy = () => {
@@ -31,13 +33,13 @@ function CopyId({ label, value }: { label: string; value: string | null }) {
     <button
       type="button"
       onClick={copy}
-      title={`点击复制 ${label}:${value}`}
+      title={t('identity.copyTitle', { label, value })}
       className="flex w-full items-center gap-1.5 text-left"
     >
       <span className="w-[52px] shrink-0 text-[10px] uppercase tracking-wide text-gray-400">{label}</span>
       <span className="flex-1 truncate font-mono text-[11px] text-gray-500">{value}</span>
       <span className={`shrink-0 text-[10px] ${copied ? 'text-emerald-500' : 'text-blue-400'}`}>
-        {copied ? '已复制' : '复制'}
+        {copied ? t('identity.copied') : t('identity.copy')}
       </span>
     </button>
   )
@@ -53,34 +55,35 @@ function IdentityIds({ userId, openId }: { userId: string | null; openId: string
 }
 
 // 左侧导航：按「测评 / 分析 / 素材库」分组，名称见名知意。
-const NAV_GROUPS: Array<{ title: string; items: Array<{ to: string; label: string; end?: boolean }> }> = [
+const NAV_GROUPS: Array<{ title: MessageKey; items: Array<{ to: string; label: MessageKey; end?: boolean }> }> = [
   {
-    title: '评测',
+    title: 'nav.group.eval',
     items: [
-      { to: '/config', label: '新建评测' },
-      { to: '/', label: '实时评测', end: true },
-      { to: '/history', label: '评测记录' },
+      { to: '/config', label: 'nav.config' },
+      { to: '/', label: 'nav.observe', end: true },
+      { to: '/history', label: 'nav.history' },
     ],
   },
   {
-    title: '分析',
+    title: 'nav.group.analysis',
     items: [
-      { to: '/dashboard', label: '数据看板' },
-      { to: '/compare', label: '版本对比' },
-      { to: '/reports', label: '评测报告' },
+      { to: '/dashboard', label: 'nav.dashboard' },
+      { to: '/compare', label: 'nav.compare' },
+      { to: '/reports', label: 'nav.reports' },
     ],
   },
   {
-    title: '素材库',
+    title: 'nav.group.library',
     items: [
-      { to: '/personas', label: '用户人设库' },
-      { to: '/roles', label: 'AI 角色库' },
+      { to: '/personas', label: 'nav.personas' },
+      { to: '/roles', label: 'nav.roles' },
     ],
   },
 ]
 
 export function App() {
   const { user, loading, login, isLocal } = useAuth()
+  const { t } = useI18n()
   const reportGenerating = useUi((s) => s.reportGenerating)
 
   // 登录门：启用登录时，未登录 → 跳转飞书 SSO 登录；本地模式下 user 恒为本地用户。
@@ -108,10 +111,10 @@ export function App() {
 
   // 鉴权未就绪 / 未登录：不渲染应用内容（登录后才能看）。
   if (loading) {
-    return <div className="flex min-h-screen items-center justify-center text-sm text-[#9CA3AF]">加载中…</div>
+    return <div className="flex min-h-screen items-center justify-center text-sm text-[#9CA3AF]">{t('app.loading')}</div>
   }
   if (!user) {
-    return <div className="flex min-h-screen items-center justify-center text-sm text-[#9CA3AF]">跳转登录中…</div>
+    return <div className="flex min-h-screen items-center justify-center text-sm text-[#9CA3AF]">{t('app.redirectingToLogin')}</div>
   }
 
   return (
@@ -141,15 +144,20 @@ export function App() {
             <path className="bot-eye" d="M9 11v2" />
             <path className="bot-eye" d="M15 11v2" />
           </svg>
-          <span className="text-xl font-bold text-[#15171E] tracking-tight">模拟评测</span>
+          <span className="text-xl font-bold text-[#15171E] tracking-tight">{t('app.title')}</span>
         </div>
         {/* 右上角头像：点击展开 姓名 / user_id / open_id（单行、点击复制）/ 退出登录。本地模式没有账号可展示 */}
-        {!isLocal && (
-          <UserMenu
-            avatarOnly
-            subtitle={<IdentityIds userId={user.id} openId={user.open_id} />}
-          />
-        )}
+        <div className="flex items-center gap-3">
+          <LanguageSwitch />
+          {!isLocal && (
+            <UserMenu
+              avatarOnly
+              labels={{ settings: t('menu.settings'), logout: t('menu.logout') }}
+              loginLabel={t('menu.login')}
+              subtitle={<IdentityIds userId={user.id} openId={user.open_id} />}
+            />
+          )}
+        </div>
       </header>
 
       <div className="flex flex-1 min-h-0">
@@ -157,11 +165,11 @@ export function App() {
         <nav className="w-[220px] shrink-0 border-r border-[#E8E8EE] px-4 py-5 space-y-5 bg-[#FAFAFC]">
           {NAV_GROUPS.map((group) => (
             <div key={group.title} className="space-y-1.5">
-              <div className="px-4 text-[11px] font-semibold uppercase tracking-widest text-[#A6ABB6]">{group.title}</div>
+              <div className="px-4 text-[11px] font-semibold uppercase tracking-widest text-[#A6ABB6]">{t(group.title)}</div>
               {group.items.map(({ to, label, end }) => {
                 // 红点：实时观战 = 有 run 在跑；优化报告 = 正在生成报告
                 const dot = (to === '/' && runActive) || (to === '/reports' && reportGenerating)
-                const dotTitle = to === '/reports' ? '报告生成中' : '运行中'
+                const dotTitle = to === '/reports' ? t('nav.dot.reportGenerating') : t('nav.dot.running')
                 return (
                   <NavLink
                     key={to}
@@ -175,7 +183,7 @@ export function App() {
                       }`
                     }
                   >
-                    <span>{label}</span>
+                    <span>{t(label)}</span>
                     {dot && (
                       <span className="ml-auto relative flex h-2.5 w-2.5" title={dotTitle}>
                         <span className="absolute inline-flex h-full w-full rounded-full bg-[#EF4444] opacity-60 animate-ping" />

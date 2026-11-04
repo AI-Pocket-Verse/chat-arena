@@ -13,12 +13,14 @@
     "bootstrap": "node -e \"const fs=require('fs');if(!fs.existsSync('api/.env.dev'))fs.copyFileSync('api/.env.example','api/.env.dev')\" && pnpm --filter @chat-arena/api db:migrate && pnpm --filter @chat-arena/api db:seed",
     "dev": "pnpm --parallel --filter @chat-arena/api --filter @chat-arena/web dev",
     "mock": "node mock/server.mjs",
+    "demo-media": "node scripts/demo-media.mjs",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\""
   },
   "devDependencies": {
+    "playwright": "1.64.1",
     "prettier": "^3.3.3"
   },
   "pnpm": {

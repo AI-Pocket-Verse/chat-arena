@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import type { ModelOption, TargetRole } from '../api'
 import { ErrorState } from '../error-state'
-import { buildRunName, buildVersionLabel, ensurePinyinLoaded, NAME_ALLOWED_HINT, NAME_ALLOWED_RE } from '../naming'
+import { useI18n } from '../i18n'
+import { buildRunName, buildVersionLabel, ensurePinyinLoaded, NAME_ALLOWED_RE } from '../naming'
 import { type RunRow, RunPicker } from '../run-picker'
 import { useUi } from '../ui-store'
 
@@ -26,6 +27,14 @@ function personaMeta(p: PersonaRow): { gender: string; intent: string; tags: str
   } catch { /* 坏 JSON 当作无结构化信息 */ }
   const tags = (p.tags ?? '').split(',').map((t) => t.trim()).filter(Boolean)
   return { gender, intent, tags }
+}
+
+// 性别存储值是 '男' / '女'，英文 AI 可能返回 male / female，两种都认。
+function genderKind(g: string): 'male' | 'female' | null {
+  const v = g.trim().toLowerCase()
+  if (v === '男' || v === 'male') return 'male'
+  if (v === '女' || v === 'female') return 'female'
+  return null
 }
 
 type EndMode = 'turns' | 'duration' | 'unlimited'
@@ -63,6 +72,7 @@ function RoleAvatar({ src, name }: { src?: string; name: string }) {
 }
 
 function RoleInfoCard({ role }: { role: TargetRole }) {
+  const { t } = useI18n()
   return (
     <div
       className="mt-3 rounded-xl border border-[#ECECF2] bg-[#F7F8FB] p-4"
@@ -73,11 +83,11 @@ function RoleInfoCard({ role }: { role: TargetRole }) {
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <span className="text-sm font-semibold text-[#15171E]">{role.name}</span>
             {role.gender === 1 ? (
-              <span className="text-xs px-1.5 py-0.5 rounded font-medium bg-[#2563EB]/10 text-[#2563EB] border border-[#2563EB]/20">♂ 男</span>
+              <span className="text-xs px-1.5 py-0.5 rounded font-medium bg-[#2563EB]/10 text-[#2563EB] border border-[#2563EB]/20">♂ {t('config.gender.male')}</span>
             ) : (
-              <span className="text-xs px-1.5 py-0.5 rounded font-medium bg-[#1664FF]/10 text-[#1664FF] border border-[#1664FF]/20">♀ 女</span>
+              <span className="text-xs px-1.5 py-0.5 rounded font-medium bg-[#1664FF]/10 text-[#1664FF] border border-[#1664FF]/20">♀ {t('config.gender.female')}</span>
             )}
-            {role.age != null && <span className="text-xs text-[#6B7280]">{role.age} 岁</span>}
+            {role.age != null && <span className="text-xs text-[#6B7280]">{t('config.roleCard.age', { age: role.age })}</span>}
             {role.city && <span className="text-xs text-[#6B7280]">{role.city}</span>}
           </div>
           {role.title && (
@@ -85,14 +95,14 @@ function RoleInfoCard({ role }: { role: TargetRole }) {
           )}
           {role.tags && role.tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mb-2">
-              {role.tags.map((t) => (
-                <span key={t} className="text-xs bg-white border border-[#E8E8EE] text-[#6B7280] px-1.5 py-0.5 rounded-full">{t}</span>
+              {role.tags.map((tag) => (
+                <span key={tag} className="text-xs bg-white border border-[#E8E8EE] text-[#6B7280] px-1.5 py-0.5 rounded-full">{tag}</span>
               ))}
             </div>
           )}
           {role.promptPersona?.identityBase && (
             <p className="text-xs text-[#6B7280] leading-relaxed line-clamp-3">
-              <span className="text-[#9CA3AF]">你是谁: </span>
+              <span className="text-[#9CA3AF]">{t('config.roleCard.who')}</span>
               {role.promptPersona.identityBase}
             </p>
           )}
@@ -105,12 +115,13 @@ function RoleInfoCard({ role }: { role: TargetRole }) {
 // 模型下拉：选项来自 GET /api/models（api/.env.* 里各家 <供应商>_MODELS 登记的模型）。
 // 缺 key 的模型仍列出并标注，选中后发起评测会被预检拦下并提示该配哪个环境变量。
 function ModelSelect({ value, onChange, models }: { value: string; onChange: (v: string) => void; models: ModelOption[] }) {
+  const { t } = useI18n()
   return (
     <select className={inputCls} value={value} onChange={(e) => onChange(e.target.value)}>
-      {models.length === 0 && <option value="">未配置模型（见 api/.env.dev 的 *_MODELS）</option>}
+      {models.length === 0 && <option value="">{t('config.model.none')}</option>}
       {models.map((m) => (
         <option key={m.id} value={m.id}>
-          {m.ready ? m.label : `${m.label}（未配置 key）`}
+          {m.ready ? m.label : t('config.model.noKey', { label: m.label })}
         </option>
       ))}
     </select>
@@ -163,6 +174,7 @@ function pickDefaultRole(roles: TargetRole[], runs: RunRow[]): TargetRole | null
 }
 
 export function Config() {
+  const { t } = useI18n()
   const { setRunId } = useUi()
   const [personas, setPersonas] = useState<PersonaRow[]>([])
   const [selected, setSelected] = useState<string[]>([])
@@ -338,7 +350,7 @@ export function Config() {
   async function start() {
     if (selected.length === 0) return
     if (nameInvalid || targetInvalid) {
-      setError(`名称不合法：${NAME_ALLOWED_HINT}`)
+      setError(t('config.error.invalidName', { hint: t('naming.allowedHint') }))
       return
     }
     setLoading(true)
@@ -395,50 +407,50 @@ export function Config() {
       }}
     >
       <div className="space-y-5">
-        <h2 className="text-xl font-semibold text-[#15171E]">新建评测</h2>
+        <h2 className="text-xl font-semibold text-[#15171E]">{t('config.title')}</h2>
 
         {/* ── Basic info ── */}
         <div className={sectionCls}>
-          <p className={sectionTitleCls}>基本信息</p>
+          <p className={sectionTitleCls}>{t('config.section.basic')}</p>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-medium text-[#6B7280]">Run 名称</label>
+                <label className="block text-xs font-medium text-[#6B7280]">{t('config.runName')}</label>
                 {nameCustom && (
-                  <button type="button" onClick={() => { setNameCustom(false); setName('') }} className="text-[11px] text-[#1664FF] hover:underline">恢复默认</button>
+                  <button type="button" onClick={() => { setNameCustom(false); setName('') }} className="text-[11px] text-[#1664FF] hover:underline">{t('config.restoreDefault')}</button>
                 )}
               </div>
               <input
                 className={`${inputCls} ${nameInvalid ? '!border-[#DC2626] focus:!border-[#DC2626] focus:!ring-[#DC2626]/20' : ''}`}
-                placeholder="自动生成：人设-角色-v1-日期"
+                placeholder={t('config.runName.placeholder')}
                 value={nameValue}
                 onChange={(e) => { setName(e.target.value); setNameCustom(true) }}
                 spellCheck={false}
               />
               <p className={`mt-1 text-[11px] leading-relaxed ${nameInvalid ? 'text-[#DC2626]' : 'text-[#9CA3AF]'}`}>
-                {nameInvalid ? NAME_ALLOWED_HINT : '默认按「人设名-角色名-v版本-日期」自动生成（中文转拼音），不修改则每次自增版本号。'}
+                {nameInvalid ? t('naming.allowedHint') : t('config.runName.hint')}
               </p>
             </div>
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-medium text-[#6B7280]">被测版本标注</label>
+                <label className="block text-xs font-medium text-[#6B7280]">{t('config.versionLabel')}</label>
                 {targetLabelCustom && (
-                  <button type="button" onClick={() => { setTargetLabelCustom(false); setTargetLabel('') }} className="text-[11px] text-[#1664FF] hover:underline">恢复默认</button>
+                  <button type="button" onClick={() => { setTargetLabelCustom(false); setTargetLabel('') }} className="text-[11px] text-[#1664FF] hover:underline">{t('config.restoreDefault')}</button>
                 )}
               </div>
               <input
                 className={`${inputCls} ${targetInvalid ? '!border-[#DC2626] focus:!border-[#DC2626] focus:!ring-[#DC2626]/20' : ''}`}
-                placeholder="自动生成：角色-v1-日期"
+                placeholder={t('config.versionLabel.placeholder')}
                 value={targetValue}
                 onChange={(e) => { setTargetLabel(e.target.value); setTargetLabelCustom(true) }}
                 spellCheck={false}
               />
               <p className={`mt-1 text-[11px] leading-relaxed ${targetInvalid ? 'text-[#DC2626]' : 'text-[#9CA3AF]'}`}>
-                {targetInvalid ? NAME_ALLOWED_HINT : '默认按「角色名-v版本-日期」自动生成，不修改则每次自增版本号。'}
+                {targetInvalid ? t('naming.allowedHint') : t('config.versionLabel.hint')}
               </p>
             </div>
           </div>
-          <Field label="被测后端地址">
+          <Field label={t('config.targetUrl')}>
             <div className="flex gap-2">
               <input
                 className={inputCls}
@@ -453,7 +465,7 @@ export function Config() {
                 disabled={testLoading || !targetBaseUrl.trim()}
                 className="shrink-0 px-3 py-2 rounded-lg text-xs font-medium border border-[#1664FF]/30 text-[#1664FF] hover:bg-[#1664FF]/5 disabled:opacity-40 transition-colors whitespace-nowrap"
               >
-                {testLoading ? '测试中…' : '连接测试'}
+                {testLoading ? t('config.test.running') : t('config.test.run')}
               </button>
             </div>
           </Field>
@@ -469,13 +481,13 @@ export function Config() {
             >
               {testResult.ok ? (
                 <>
-                  <p className="font-semibold">连接成功</p>
+                  <p className="font-semibold">{t('config.test.ok')}</p>
                   {testResult.tokenOk && (
                     <p className="text-[#059669]/80">Token: OK</p>
                   )}
                   {testResult.replyOk != null && (
                     <p className="text-[#059669]/80">
-                      Reply: {testResult.replyOk ? 'OK' : '无响应'}
+                      Reply: {testResult.replyOk ? 'OK' : t('config.test.noReply')}
                     </p>
                   )}
                   {testResult.sampleReply && (
@@ -485,17 +497,17 @@ export function Config() {
                   )}
                   <div className="flex gap-4 text-[#059669]/70">
                     {testResult.firstTokenMs != null && (
-                      <span>首 Token {testResult.firstTokenMs} ms</span>
+                      <span>{t('config.test.firstToken', { ms: testResult.firstTokenMs })}</span>
                     )}
                     {testResult.totalMs != null && (
-                      <span>总耗时 {testResult.totalMs} ms</span>
+                      <span>{t('config.test.total', { ms: testResult.totalMs })}</span>
                     )}
                   </div>
                 </>
               ) : (
                 <>
                   <p className="font-semibold">
-                    连接失败{testResult.stage ? `（${testResult.stage}）` : ''}
+                    {testResult.stage ? t('config.test.failStage', { stage: testResult.stage }) : t('config.test.fail')}
                   </p>
                   {testResult.error && (
                     <p className="text-[#DC2626]/80 font-mono break-all">
@@ -510,9 +522,9 @@ export function Config() {
 
         {/* ── TA config ── */}
         <div className={sectionCls}>
-          <p className={sectionTitleCls}>TA 配置</p>
+          <p className={sectionTitleCls}>{t('config.section.ta')}</p>
           <div className="grid grid-cols-3 gap-4">
-            <Field label="TA 角色">
+            <Field label={t('config.role')}>
               {roles.length > 0 ? (
                 <select
                   className={inputCls}
@@ -521,7 +533,7 @@ export function Config() {
                 >
                   {roles.map((r) => (
                     <option key={r.id} value={r.id}>
-                      {r.name}（{r.gender === 1 ? '男' : '女'}）
+                      {t('config.role.option', { name: r.name, gender: r.gender === 1 ? t('config.gender.male') : t('config.gender.female') })}
                     </option>
                   ))}
                 </select>
@@ -531,15 +543,15 @@ export function Config() {
                   value={taGender}
                   onChange={(e) => setTaGender(Number(e.target.value) as 1 | 2)}
                 >
-                  <option value={2}>女 (2)</option>
-                  <option value={1}>男 (1)</option>
+                  <option value={2}>{t('config.gender.femaleCode')}</option>
+                  <option value={1}>{t('config.gender.maleCode')}</option>
                 </select>
               )}
             </Field>
-            <Field label="模拟用户模型">
+            <Field label={t('config.userModel')}>
               <ModelSelect value={userModel} onChange={setUserModel} models={models} />
             </Field>
-            <Field label="裁判模型">
+            <Field label={t('config.judgeModel')}>
               <ModelSelect value={judgeModel} onChange={setJudgeModel} models={models} />
             </Field>
           </div>
@@ -548,15 +560,15 @@ export function Config() {
 
         {/* ── End condition ── */}
         <div className={sectionCls}>
-          <p className={sectionTitleCls}>结束条件</p>
+          <p className={sectionTitleCls}>{t('config.section.end')}</p>
           <div className="flex gap-2 mb-4">
-            {modeBtn('turns', '轮数上限')}
-            {modeBtn('duration', '时长上限')}
-            {modeBtn('unlimited', '不限制')}
+            {modeBtn('turns', t('config.end.turns'))}
+            {modeBtn('duration', t('config.end.duration'))}
+            {modeBtn('unlimited', t('config.end.unlimited'))}
           </div>
           <div className="grid grid-cols-2 gap-4">
             {endModes.has('turns') && !endModes.has('unlimited') && (
-              <Field label="最大轮数">
+              <Field label={t('config.end.maxTurns')}>
                 <input
                   type="number"
                   min={1}
@@ -567,7 +579,7 @@ export function Config() {
               </Field>
             )}
             {endModes.has('duration') && !endModes.has('unlimited') && (
-              <Field label="最大时长（秒）">
+              <Field label={t('config.end.maxDuration')}>
                 <input
                   type="number"
                   min={1}
@@ -582,11 +594,11 @@ export function Config() {
 
         {/* ── Execution ── */}
         <div className={sectionCls}>
-          <p className={sectionTitleCls}>执行参数</p>
+          <p className={sectionTitleCls}>{t('config.section.exec')}</p>
           <div className="grid grid-cols-2 gap-4">
             <Field
-              label="并发数（1–16）"
-              hint="同时进行的会话数。越大整体跑得越快，但对被测后端和模型接口的压力也越大；本地联调建议 2–4。"
+              label={t('config.concurrency')}
+              hint={t('config.concurrency.hint')}
             >
               <input
                 type="number"
@@ -598,8 +610,8 @@ export function Config() {
               />
             </Field>
             <Field
-              label="重复次数（1–50）"
-              hint="每个人设独立重跑的次数。多次重复可摊平单次随机性、让评分更稳定（总会话数 = 人设数 × 重复次数）。"
+              label={t('config.repetitions')}
+              hint={t('config.repetitions.hint')}
             >
               <input
                 type="number"
@@ -612,26 +624,26 @@ export function Config() {
             </Field>
           </div>
           <Field
-            label="A/B 回放：源 Run（可选）"
-            hint="选择一个已完成的历史 Run，逐轮复用它的「用户台词」回放——用于 A/B 对比：只换被测后端版本/模型，保持用户输入完全一致。不选则由模拟用户实时生成。"
+            label={t('config.replay')}
+            hint={t('config.replay.hint')}
           >
             <RunPicker
               runs={finishedRuns}
               value={replayFromRunId}
               onChange={setReplayFromRunId}
-              placeholder="选择源 Run（仅已完成；默认不回放，实时生成）"
+              placeholder={t('config.replay.placeholder')}
               allowClear
-              clearLabel="（不回放，实时生成）"
+              clearLabel={t('config.replay.clear')}
             />
           </Field>
         </div>
 
         {/* ── Personas ── */}
         <div className={sectionCls}>
-          <p className={sectionTitleCls}>人设选择</p>
+          <p className={sectionTitleCls}>{t('config.section.personas')}</p>
           {personas.length === 0 ? (
             <p className="text-[#6B7280] text-sm">
-              暂无人设。请先在「人设库」页面创建人设。
+              {t('config.personas.empty')}
             </p>
           ) : (
             <div className="space-y-2">
@@ -658,27 +670,27 @@ export function Config() {
                     <span className="text-sm text-[#15171E] shrink-0">{p.name}</span>
                     {gender && (
                       <span className="text-[11px] text-[#6B7280] shrink-0">
-                        {gender === '男' ? '♂' : gender === '女' ? '♀' : ''} {gender}
+                        {genderKind(gender) === 'male' ? '♂' : genderKind(gender) === 'female' ? '♀' : ''} {genderKind(gender) === 'male' ? t('config.gender.male') : genderKind(gender) === 'female' ? t('config.gender.female') : gender}
                       </span>
                     )}
                     {/* 意图：占据剩余空间，超出单行省略 */}
                     {intent && (
                       <span className="text-xs text-[#9CA3AF] truncate min-w-0 flex-1" title={intent}>
-                        意图：{intent}
+                        {t('config.persona.intent', { intent })}
                       </span>
                     )}
                     {/* 标签：最多 3 个，固定宽度不挤压，超出不换行 */}
                     {tags.length > 0 && (
                       <span className={`flex items-center gap-1 shrink-0 ${intent ? '' : 'ml-auto'}`}>
-                        {tags.slice(0, 3).map((t) => (
-                          <span key={t} className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#F7F8FB] border border-[#E8E8EE] text-[#6B7280] max-w-[6rem] truncate">
-                            {t}
+                        {tags.slice(0, 3).map((tag) => (
+                          <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#F7F8FB] border border-[#E8E8EE] text-[#6B7280] max-w-[6rem] truncate">
+                            {tag}
                           </span>
                         ))}
                       </span>
                     )}
                     <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 ${!intent && tags.length === 0 ? 'ml-auto' : ''} ${redteam ? 'bg-[#DC2626]/10 text-[#DC2626]' : 'bg-[#1664FF]/10 text-[#1664FF]'}`}>
-                      {redteam ? '对抗' : '普通'}
+                      {redteam ? t('config.persona.redteam') : t('config.persona.normal')}
                     </span>
                   </label>
                 )
@@ -688,7 +700,7 @@ export function Config() {
         </div>
 
         {/* ── Error + Submit ── */}
-        {error != null && <ErrorState error={error} title="无法开始评测" />}
+        {error != null && <ErrorState error={error} title={t('config.error.title')} />}
 
         <button
           className="w-full px-6 py-3 rounded-xl text-sm font-semibold text-white transition-opacity disabled:opacity-40"
@@ -696,7 +708,7 @@ export function Config() {
           disabled={selected.length === 0 || loading || nameInvalid || targetInvalid}
           onClick={start}
         >
-          {loading ? '启动中…' : '开始'}
+          {loading ? t('config.starting') : t('config.start')}
         </button>
       </div>
     </div>

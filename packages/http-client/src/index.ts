@@ -23,6 +23,8 @@ export interface HttpClientConfig {
   baseUrl: string
   /** Default headers merged into every request */
   headers?: Record<string, string>
+  /** Extra headers computed per request (e.g. the current UI language) */
+  getHeaders?: () => Record<string, string>
   /** Hook to inject auth token (called per-request) */
   getToken?: () => Promise<string | null> | string | null
   /** Called when server returns 401 — typically triggers re-login */
@@ -39,7 +41,7 @@ export function createHttpClient(config: HttpClientConfig) {
       }
     }
 
-    const finalHeaders: Record<string, string> = { ...config.headers, ...(headers as Record<string, string>) }
+    const finalHeaders: Record<string, string> = { ...config.headers, ...config.getHeaders?.(), ...(headers as Record<string, string>) }
     const token = await config.getToken?.()
     if (token) finalHeaders.Authorization = `Bearer ${token}`
     if (init.body && !(init.body instanceof FormData) && !finalHeaders['Content-Type']) {

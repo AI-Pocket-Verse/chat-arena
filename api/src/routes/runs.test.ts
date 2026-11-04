@@ -33,6 +33,18 @@ describe('runsRoutes', () => {
     await app.close()
   })
 
+  it('POST /api/runs stores the UI language from X-Lang (default zh)', async () => {
+    await prisma.persona.upsert({ where: { id: 'p-lang' }, create: { id: 'p-lang', name: 'lang', category: 'normal', structuredJson: '{}', systemPrompt: 'x', createdAt: new Date(), updatedAt: new Date() }, update: {} })
+    const app = Fastify()
+    await app.register(runsRoutes, { targetBaseUrl: 'http://localhost:8680', prisma, startRun: async () => {} })
+    const payload = { targetBaseUrl: 'http://localhost:8680', personaIds: ['p-lang'], taGender: 2, userModel: 'qwen:qwen-max', judgeModel: 'qwen:qwen-max', endCondition: { maxTurns: 1 }, concurrency: 1, repetitions: 1 }
+    const en = await app.inject({ method: 'POST', url: '/api/runs', headers: { 'x-lang': 'en' }, payload })
+    const zh = await app.inject({ method: 'POST', url: '/api/runs', payload })
+    expect((await prisma.run.findUniqueOrThrow({ where: { id: en.json().runId } })).lang).toBe('en')
+    expect((await prisma.run.findUniqueOrThrow({ where: { id: zh.json().runId } })).lang).toBe('zh')
+    await app.close()
+  })
+
   it('GET /api/models lists registered models with readiness, never keys or URLs', async () => {
     const modelRegistry = buildModelRegistry({ QWEN_API_KEY: 'secret-key', QWEN_MODELS: 'qwen-max', DEEPSEEK_MODELS: 'deepseek-chat' })
     const app = Fastify()
@@ -48,6 +60,9 @@ describe('runsRoutes', () => {
     })
     expect(r.body).not.toContain('secret-key')
     expect(r.body).not.toContain('dashscope')
+    // 英文界面：供应商名用英文
+    const en = await app.inject({ method: 'GET', url: '/api/models', headers: { 'x-lang': 'en' } })
+    expect(en.json().models[0]).toMatchObject({ label: 'Qwen · qwen-max' })
     await app.close()
   })
 
@@ -294,7 +309,14 @@ describe('runsRoutes', () => {
       payload: { targetBaseUrl: 'http://localhost:8680', personaIds: ['p-archived'], taGender: 2, userModel: 'qwen:qwen-max', judgeModel: 'deepseek:deepseek-chat', endCondition: { maxTurns: 2 }, concurrency: 1, repetitions: 1 },
     })
     expect(r.statusCode).toBe(400)
-    expect(r.json().error).toMatch(/归档/)
+    expect(r.json()).toMatchObject({ error: 'persona_archived' })
+    expect(r.json().message).toMatch(/归档/)
+    // X-Lang: en → 英文提示
+    const en = await app.inject({
+      method: 'POST', url: '/api/runs', headers: { 'x-lang': 'en' },
+      payload: { targetBaseUrl: 'http://localhost:8680', personaIds: ['p-archived'], taGender: 2, userModel: 'qwen:qwen-max', judgeModel: 'deepseek:deepseek-chat', endCondition: { maxTurns: 2 }, concurrency: 1, repetitions: 1 },
+    })
+    expect(en.json().message).toMatch(/archived/)
     await app.close()
   })
 

@@ -2,9 +2,10 @@ import { randomUUID } from 'node:crypto'
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import type { PrismaClient } from '../../generated/prisma'
-import { modelConfigError, type ModelClient, type ModelRegistry } from '../clients/model-client'
+import { modelConfigError, modelLabel, type ModelClient, type ModelRegistry } from '../clients/model-client'
 import { createTargetClient } from '../clients/target-client'
 import { stopRegistry } from '../engine/stop-registry'
+import { outputLanguageRule, parseLang, pick, reqLang, type Lang } from '../i18n'
 import { HARD_MAX_TURNS } from '../engine/end-condition'
 
 const RunConfigSchema = z.object({
@@ -52,8 +53,8 @@ function mobileTail(s: string | null | undefined): string {
 
 export async function runsRoutes(app: FastifyInstance, opts: RunsRoutesOpts): Promise<void> {
   const { prisma, startRun, modelClient } = opts
-  const targetClient = (baseUrl: string) =>
-    createTargetClient({ baseUrl, debugKey: opts.targetDebugKey ?? '', headers: opts.targetHeaders })
+  const targetClient = (baseUrl: string, lang?: Lang) =>
+    createTargetClient({ baseUrl, debugKey: opts.targetDebugKey ?? '', headers: opts.targetHeaders, lang })
 
   // 被测后端地址白名单：Debug Key 与额外请求头会随请求发给该地址，只允许可信 origin，
   // 否则任意网页 / 成员都能借接口把口令发给自己控制的服务器（同时是 SSRF 入口）。
@@ -65,9 +66,12 @@ export async function runsRoutes(app: FastifyInstance, opts: RunsRoutesOpts): Pr
   const isTargetAllowed = (url: string): boolean => {
     try { return allowedOrigins.has(new URL(url).origin) } catch { return false }
   }
-  const targetNotAllowed = (url: string) => ({
+  const targetNotAllowed = (url: string, lang: Lang) => ({
     error: 'target_not_allowed',
-    message: `被测后端地址 ${url} 不在允许名单内。请在 api 环境变量 TARGET_ALLOWED_ORIGINS 中加入它的 origin（如 https://example.com），或把它设为 TARGET_BASE_URL。`,
+    message: pick(lang, {
+      zh: `被测后端地址 ${url} 不在允许名单内。请在 api 环境变量 TARGET_ALLOWED_ORIGINS 中加入它的 origin（如 https://example.com），或把它设为 TARGET_BASE_URL。`,
+      en: `The backend address ${url} is not in the allowlist. Add its origin (e.g. https://example.com) to the api's TARGET_ALLOWED_ORIGINS, or set it as TARGET_BASE_URL.`,
+    }),
   })
 
   // 管理员判定：未开启登录（本地单机）→ 一律视为管理员；开启后按手机号命中 ADMIN_MOBILES。
@@ -83,12 +87,13 @@ export async function runsRoutes(app: FastifyInstance, opts: RunsRoutesOpts): Pr
   app.get('/api/me', async (req) => ({ isAdmin: isAdmin(req.user), defaultTargetBaseUrl: opts.targetBaseUrl ?? '' }))
 
   // 新建评测页的模型下拉：只列 api/.env.* 里登记过的模型，不返回 key 与地址
-  app.get('/api/models', async () => {
+  app.get('/api/models', async (req) => {
     const reg = opts.modelRegistry ?? {}
+    const lang = reqLang(req)
     return {
       models: Object.values(reg).map((m) => {
-        const bad = modelConfigError(reg, m.id)
-        return { id: m.id, label: m.label, ready: !bad, ...(bad ? { message: bad.message } : {}) }
+        const bad = modelConfigError(reg, m.id, lang)
+        return { id: m.id, label: modelLabel(m, lang), ready: !bad, ...(bad ? { message: bad.message } : {}) }
       }),
       defaultModel: opts.defaultModel?.() ?? null,
     }
@@ -98,12 +103,12 @@ export async function runsRoutes(app: FastifyInstance, opts: RunsRoutesOpts): Pr
     const body = RunConfigSchema.safeParse(req.body)
     if (!body.success) return reply.code(400).send({ error: body.error.message })
     const cfg = body.data
-    if (!isTargetAllowed(cfg.targetBaseUrl)) return reply.code(403).send(targetNotAllowed(cfg.targetBaseUrl))
+    if (!isTargetAllowed(cfg.targetBaseUrl)) return reply.code(403).send(targetNotAllowed(cfg.targetBaseUrl, reqLang(req)))
 
     // 模型预检：缺 key / 模型名时直接返回该配哪个环境变量，而不是跑到一半才失败
     if (opts.modelRegistry) {
       for (const alias of new Set([cfg.userModel, cfg.judgeModel])) {
-        const bad = modelConfigError(opts.modelRegistry, alias)
+        const bad = modelConfigError(opts.modelRegistry, alias, reqLang(req))
         if (bad) return reply.code(bad.error === 'unknown_model' ? 400 : 503).send(bad)
       }
     }
@@ -122,7 +127,7 @@ export async function runsRoutes(app: FastifyInstance, opts: RunsRoutesOpts): Pr
       const archivedPersonas = personas.filter(p => p.archivedAt !== null)
       if (archivedPersonas.length > 0) {
         const names = archivedPersonas.map(p => `"${p.name}"(${p.id})`).join(', ')
-        return reply.code(400).send({ error: `以下人设已归档，不可用于新评测：${names}` })
+        return reply.code(400).send({ error: 'persona_archived', message: pick(reqLang(req), { zh: `以下人设已归档，不可用于新评测：${names}`, en: `These personas are archived and cannot be used in a new evaluation: ${names}` }) })
       }
     }
 
@@ -188,6 +193,8 @@ export async function runsRoutes(app: FastifyInstance, opts: RunsRoutesOpts): Pr
         personaSetJson: JSON.stringify(cfg.personaIds),
         userModel: cfg.userModel,
         judgeModel: cfg.judgeModel,
+        // 发起时的界面语言：这次评测里模拟用户台词、裁判点评、报告都用它
+        lang: reqLang(req),
         endConditionJson: JSON.stringify(cfg.endCondition),
         concurrency: cfg.concurrency,
         repetitions: cfg.repetitions,
@@ -354,7 +361,7 @@ export async function runsRoutes(app: FastifyInstance, opts: RunsRoutesOpts): Pr
       if (baseUrl && !isTargetAllowed(baseUrl)) {
         req.log.warn({ baseUrl }, '[report] 被测后端地址不在白名单内，跳过 Prompt 对比模块')
       } else if (baseUrl) {
-        const nclient = targetClient(baseUrl)
+        const nclient = targetClient(baseUrl, parseLang(run.lang))
         const roles = await nclient.listRoles()
         const role = roles.find((r) => r.gender === run.taGender) ?? roles[0]
         originalPrompt = role?.renderedPrompt?.trim() || null
@@ -408,7 +415,9 @@ export async function runsRoutes(app: FastifyInstance, opts: RunsRoutesOpts): Pr
         '- memoryIssues：记忆系统问题（结合记忆命中/未命中）',
         '- safetyIssues：安全 / 人设边界问题（结合 violationSamples 具体点名）',
         '- prioritizedActions：字符串数组，按优先级排序的可执行改进项（最多 6 条）',
-        '全部用中文。',
+        parseLang(run.lang) === 'en'
+          ? outputLanguageRule('en', { zh: '所有字段的内容（revisedPrompt 除外）', en: 'every field value except revisedPrompt, which keeps the language of originalPrompt' })
+          : '全部用中文。',
       ].join('\n')
       synthesize = async (input) => {
         try {
@@ -441,6 +450,7 @@ export async function runsRoutes(app: FastifyInstance, opts: RunsRoutesOpts): Pr
       memoryMisses,
       originalPrompt,
       synthesizeSuggestions: synthesize,
+      lang: parseLang(run.lang),
     })
 
     // 修复：同一 Run 只保留一份报告（重新生成=覆盖），避免重名重复报告堆积。
@@ -519,9 +529,9 @@ export async function runsRoutes(app: FastifyInstance, opts: RunsRoutesOpts): Pr
   app.get<{ Querystring: { targetBaseUrl?: string } }>('/api/roles', async (req, reply) => {
     const baseUrl = req.query.targetBaseUrl || opts.targetBaseUrl || ''
     if (!baseUrl) return reply.code(400).send({ error: 'targetBaseUrl query param or server config required' })
-    if (!isTargetAllowed(baseUrl)) return reply.code(403).send(targetNotAllowed(baseUrl))
+    if (!isTargetAllowed(baseUrl)) return reply.code(403).send(targetNotAllowed(baseUrl, reqLang(req)))
     try {
-      const client = targetClient(baseUrl)
+      const client = targetClient(baseUrl, reqLang(req))
       const roles = await client.listRoles()
       return reply.send({ roles })
     } catch (err) {
@@ -538,8 +548,9 @@ export async function runsRoutes(app: FastifyInstance, opts: RunsRoutesOpts): Pr
     const body = ConnectionTestSchema.safeParse(req.body)
     if (!body.success) return reply.code(400).send({ error: body.error.message })
     const { targetBaseUrl, taGender } = body.data
-    if (!isTargetAllowed(targetBaseUrl)) return reply.code(403).send(targetNotAllowed(targetBaseUrl))
-    const target = targetClient(targetBaseUrl)
+    if (!isTargetAllowed(targetBaseUrl)) return reply.code(403).send(targetNotAllowed(targetBaseUrl, reqLang(req)))
+    const lang = reqLang(req)
+    const target = targetClient(targetBaseUrl, lang)
     const t0 = Date.now()
     let token: string
     try {
@@ -552,7 +563,7 @@ export async function runsRoutes(app: FastifyInstance, opts: RunsRoutesOpts): Pr
     let sampleReply = ''
     const t1 = Date.now()
     try {
-      const result = await target.chat(token, '你好', randomUUID(), {
+      const result = await target.chat(token, pick(lang, { zh: '你好', en: 'Hello' }), randomUUID(), {
         onDelta: (d) => {
           if (firstTokenMs === null) firstTokenMs = Date.now() - t1
           sampleReply += d

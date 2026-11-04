@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api'
 import type { TargetRole } from '../api'
 import { ErrorState } from '../error-state'
+import { useI18n, type MessageKey } from '../i18n'
 
 // ── shared style tokens (light/blue) ───────────────────────────────────────
 
@@ -9,14 +10,14 @@ const sectionCls = 'p-4 rounded-xl border border-[#ECECF2] bg-[#F7F8FB]'
 const sectionTitleCls = 'text-xs font-semibold text-[#9CA3AF] uppercase tracking-widest mb-2'
 const tagCls = 'text-xs bg-white border border-[#E8E8EE] text-[#6B7280] px-2 py-0.5 rounded-full'
 
-const PERSONA_SECTIONS: { key: keyof NonNullable<TargetRole['promptPersona']>; label: string }[] = [
-  { key: 'identityBase', label: '你是谁' },
-  { key: 'relationshipBase', label: '关系定位' },
-  { key: 'dailyStyle', label: '日常风格' },
-  { key: 'emotionSupport', label: '情绪陪伴' },
-  { key: 'mediaPolicy', label: '图片表达' },
-  { key: 'realityBoundary', label: '现实边界' },
-  { key: 'safetyBoundary', label: '安全边界' },
+const PERSONA_SECTIONS: { key: keyof NonNullable<TargetRole['promptPersona']>; label: MessageKey }[] = [
+  { key: 'identityBase', label: 'roles.persona.identityBase' },
+  { key: 'relationshipBase', label: 'roles.persona.relationshipBase' },
+  { key: 'dailyStyle', label: 'roles.persona.dailyStyle' },
+  { key: 'emotionSupport', label: 'roles.persona.emotionSupport' },
+  { key: 'mediaPolicy', label: 'roles.persona.mediaPolicy' },
+  { key: 'realityBoundary', label: 'roles.persona.realityBoundary' },
+  { key: 'safetyBoundary', label: 'roles.persona.safetyBoundary' },
 ]
 
 // ── sub-components ────────────────────────────────────────────────────────────
@@ -46,13 +47,14 @@ function Avatar({ src, name, size = 64 }: { src?: string; name: string; size?: n
 }
 
 function GenderBadge({ gender }: { gender: 1 | 2 }) {
+  const { t } = useI18n()
   return gender === 1 ? (
     <span className="text-xs px-1.5 py-0.5 rounded font-medium bg-[#2563EB]/10 text-[#2563EB] border border-[#2563EB]/20">
-      ♂ 男
+      ♂ {t('roles.gender.male')}
     </span>
   ) : (
     <span className="text-xs px-1.5 py-0.5 rounded font-medium bg-[#1664FF]/10 text-[#1664FF] border border-[#1664FF]/20">
-      ♀ 女
+      ♀ {t('roles.gender.female')}
     </span>
   )
 }
@@ -60,6 +62,7 @@ function GenderBadge({ gender }: { gender: 1 | 2 }) {
 // ── selected role full content (full width, everything expanded) ──────────────
 
 function RoleDetail({ role }: { role: TargetRole }) {
+  const { t } = useI18n()
   // 区块锚点（每个角色独立 id，避免切换角色时锚点冲突）
   const personaAnchor = `role-${role.id}-persona`
   const renderedAnchor = `role-${role.id}-rendered`
@@ -70,9 +73,9 @@ function RoleDetail({ role }: { role: TargetRole }) {
   }
 
   const anchors: { id: string; label: string; show: boolean }[] = [
-    { id: personaAnchor, label: '完整设定', show: true },
-    { id: renderedAnchor, label: '完整渲染', show: !!role.renderedPrompt },
-    { id: chatAnchor, label: '聊天人设', show: !!role.chatPersona },
+    { id: personaAnchor, label: t('roles.anchor.persona'), show: true },
+    { id: renderedAnchor, label: t('roles.anchor.rendered'), show: !!role.renderedPrompt },
+    { id: chatAnchor, label: t('roles.anchor.chat'), show: !!role.chatPersona },
   ]
 
   return (
@@ -89,16 +92,16 @@ function RoleDetail({ role }: { role: TargetRole }) {
               <span className="text-2xl font-bold text-[#15171E]">{role.name}</span>
               {role.nickname && <span className="text-base text-[#6B7280]">({role.nickname})</span>}
               <GenderBadge gender={role.gender} />
-              {role.age != null && <span className="text-sm text-[#6B7280]">{role.age} 岁</span>}
+              {role.age != null && <span className="text-sm text-[#6B7280]">{t('roles.age', { age: role.age })}</span>}
               {role.city && <span className="text-sm text-[#6B7280]">{role.city}</span>}
               {(role.height ?? 0) > 0 && <span className="text-sm text-[#6B7280]">{role.height} cm</span>}
             </div>
             {role.title && <p className="text-sm text-[#1664FF] font-medium mb-3">{role.title}</p>}
             {role.tags && role.tags.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mb-3">
-                {role.tags.map((t) => (
-                  <span key={t} className={tagCls}>
-                    {t}
+                {role.tags.map((tag) => (
+                  <span key={tag} className={tagCls}>
+                    {tag}
                   </span>
                 ))}
               </div>
@@ -126,14 +129,14 @@ function RoleDetail({ role }: { role: TargetRole }) {
 
       {/* 完整设定 — 7 段，全部展开 */}
       <div id={personaAnchor} className="scroll-mt-24">
-        <p className={sectionTitleCls}>完整设定（7 段基础 prompt）</p>
+        <p className={sectionTitleCls}>{t('roles.section.persona')}</p>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           {PERSONA_SECTIONS.map(({ key, label }) => {
             const text = role.promptPersona?.[key]
             if (!text) return null
             return (
               <div key={key} className={sectionCls}>
-                <p className="text-xs font-semibold text-[#1664FF] mb-2">{label}</p>
+                <p className="text-xs font-semibold text-[#1664FF] mb-2">{t(label)}</p>
                 <p className="text-sm text-[#374151] leading-relaxed whitespace-pre-wrap">{text}</p>
               </div>
             )
@@ -144,7 +147,7 @@ function RoleDetail({ role }: { role: TargetRole }) {
       {/* 完整渲染 prompt — 全部展开 */}
       {role.renderedPrompt && (
         <div id={renderedAnchor} className="scroll-mt-24">
-          <p className={sectionTitleCls}>完整渲染 prompt</p>
+          <p className={sectionTitleCls}>{t('roles.section.rendered')}</p>
           <pre className="text-sm text-[#374151] font-mono bg-[#F7F8FB] border border-[#ECECF2] rounded-xl p-5 whitespace-pre-wrap leading-relaxed">
             {role.renderedPrompt}
           </pre>
@@ -154,7 +157,7 @@ function RoleDetail({ role }: { role: TargetRole }) {
       {/* 聊天人设（单行人设） */}
       {role.chatPersona && (
         <div id={chatAnchor} className="scroll-mt-24">
-          <p className={sectionTitleCls}>聊天人设</p>
+          <p className={sectionTitleCls}>{t('roles.section.chat')}</p>
           <pre className="text-sm text-[#374151] font-mono bg-[#F7F8FB] border border-[#ECECF2] rounded-xl p-5 whitespace-pre-wrap leading-relaxed">
             {role.chatPersona}
           </pre>
@@ -167,6 +170,7 @@ function RoleDetail({ role }: { role: TargetRole }) {
 // ── main page ─────────────────────────────────────────────────────────────────
 
 export function Roles() {
+  const { t } = useI18n()
   const [roles, setRoles] = useState<TargetRole[]>([])
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
@@ -198,7 +202,7 @@ export function Roles() {
     >
       {/* ── Sticky header: title + role tabs ── */}
       <div className="sticky top-0 z-10 bg-white/85 backdrop-blur border-b border-[#E8E8EE] px-6 pt-5 pb-3">
-        <h2 className="text-xl font-semibold text-[#15171E] mb-3">角色库</h2>
+        <h2 className="text-xl font-semibold text-[#15171E] mb-3">{t('roles.title')}</h2>
         {roles.length > 0 && (
           <div className="flex items-center gap-2 flex-wrap">
             {roles.map((role) => {
@@ -226,14 +230,14 @@ export function Roles() {
 
       {/* ── Content (full width, scrolls with the main panel) ── */}
       <div className="px-6 py-6">
-        {loading && <div className="text-sm text-[#9CA3AF] py-12 text-center">加载中…</div>}
+        {loading && <div className="text-sm text-[#9CA3AF] py-12 text-center">{t('roles.loading')}</div>}
 
         {!loading && error != null && (
-          <ErrorState error={error} title="角色库加载失败" onRetry={load} className="max-w-2xl" />
+          <ErrorState error={error} title={t('roles.loadFailed')} onRetry={load} className="max-w-2xl" />
         )}
 
         {!loading && !error && roles.length === 0 && (
-          <p className="text-sm text-[#9CA3AF] py-12 text-center">暂无角色数据。</p>
+          <p className="text-sm text-[#9CA3AF] py-12 text-center">{t('roles.empty')}</p>
         )}
 
         {!loading && !error && selected && <RoleDetail role={selected} />}

@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { api, type ReportRow } from '../api'
 import { ConfirmDialog } from '../confirm-dialog'
 import { ErrorState } from '../error-state'
+import { useI18n } from '../i18n'
 import { parseReport, type ReportData, ReportView } from '../report-view'
 import { type RunRow, RunPicker } from '../run-picker'
 import { useUi } from '../ui-store'
@@ -34,6 +35,7 @@ const MD_CLS = `rounded-xl border border-[#ECECF2] bg-white p-5 overflow-auto ma
 // 进度说明：耗时几乎全在一次 LLM 综合分析调用上，服务端拿不到真实进度，
 // 因此按典型耗时做渐近预估（前快后慢逼近 95%），完成时直接展示报告。
 function GeneratingPanel() {
+  const { t } = useI18n()
   const [pct, setPct] = useState(0)
   useEffect(() => {
     const t0 = Date.now()
@@ -45,10 +47,10 @@ function GeneratingPanel() {
     return () => clearInterval(timer)
   }, [])
   const stage =
-    pct < 20 ? '正在汇总各轮评分与硬指标…'
-      : pct < 45 ? '正在挑选典型高分/低分样例…'
-        : pct < 90 ? '模型撰写综合分析中（最耗时的一步）…'
-          : '正在排版整理，即将完成…'
+    pct < 20 ? t('reports.gen.stage1')
+      : pct < 45 ? t('reports.gen.stage2')
+        : pct < 90 ? t('reports.gen.stage3')
+          : t('reports.gen.stage4')
   return (
     <div
       className="rounded-xl border border-[#ECECF2] bg-white px-8 py-14 flex flex-col items-center"
@@ -61,7 +63,7 @@ function GeneratingPanel() {
           <span className="text-lg font-semibold font-mono text-[#1664FF]">{pct}%</span>
         </div>
       </div>
-      <div className="text-sm font-medium text-[#15171E] mb-1">正在生成评测报告…</div>
+      <div className="text-sm font-medium text-[#15171E] mb-1">{t('reports.gen.title')}</div>
       <div className="text-xs text-[#9CA3AF] mb-6">{stage}</div>
       {/* 预估进度条 */}
       <div className="w-full max-w-md">
@@ -71,16 +73,16 @@ function GeneratingPanel() {
             style={{ width: `${pct}%`, background: 'linear-gradient(90deg, #1664FF, #5B9CFF)' }}
           />
         </div>
-        <div className="mt-2 text-center text-[10px] text-[#C2C7D0]">进度为预估值，完成后自动展示报告</div>
+        <div className="mt-2 text-center text-[10px] text-[#C2C7D0]">{t('reports.gen.note')}</div>
       </div>
     </div>
   )
 }
 
-function fmtDate(s: string): string {
+function fmtDate(s: string, locale: string): string {
   try {
     // 固定北京时间展示,与运行环境/访问者时区无关。
-    return new Date(s).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+    return new Date(s).toLocaleString(locale, { timeZone: 'Asia/Shanghai', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
   } catch { return '' }
 }
 
@@ -93,9 +95,9 @@ function avgColor(v: number): string {
 }
 
 // 把报告 Markdown 渲染结果包成带内嵌样式的独立 HTML 文档（下载用）
-function buildReportHtml(title: string, bodyHtml: string): string {
+function buildReportHtml(title: string, bodyHtml: string, locale: string): string {
   return `<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="${locale}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -129,6 +131,7 @@ ${bodyHtml}
 }
 
 export function Reports() {
+  const { t, locale } = useI18n()
   const { reportGenerating, setReportGenerating } = useUi()
   const [reports, setReports] = useState<ReportRow[]>([])
   const [runs, setRuns] = useState<RunRow[]>([])
@@ -226,10 +229,10 @@ export function Reports() {
   function download(format: 'md' | 'html') {
     if (!viewRunId || markdown == null) return
     try {
-      const title = reports.find((r) => r.id === selectedId)?.runName?.trim() || '评测报告'
+      const title = reports.find((r) => r.id === selectedId)?.runName?.trim() || t('reports.title')
       const content = format === 'md'
         ? markdown
-        : buildReportHtml(title, renderToStaticMarkup(<ReactMarkdown>{markdown}</ReactMarkdown>))
+        : buildReportHtml(title, renderToStaticMarkup(<ReactMarkdown>{markdown}</ReactMarkdown>), locale)
       const blob = new Blob([content], { type: format === 'md' ? 'text/markdown' : 'text/html;charset=utf-8' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -246,7 +249,7 @@ export function Reports() {
       style={{ background: 'radial-gradient(50rem 30rem at 100% -8%, rgba(22,100,255,0.05), transparent 60%), #ffffff' }}
     >
       <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
-        <h2 className="text-xl font-semibold text-[#15171E]">评测报告</h2>
+        <h2 className="text-xl font-semibold text-[#15171E]">{t('reports.title')}</h2>
         <div className="flex items-center gap-2">
           {/* 选某个「已完成且未生成报告」的评测生成 */}
           <div className="w-60">
@@ -254,7 +257,7 @@ export function Reports() {
               runs={eligibleRuns}
               value={pickRunId}
               onChange={setPickRunId}
-              placeholder="选择已完成且未生成报告的评测"
+              placeholder={t('reports.pickRun')}
             />
           </div>
           <button
@@ -262,7 +265,7 @@ export function Reports() {
             disabled={!pickRunId || reportGenerating}
             onClick={() => void generateFor(pickRunId)}
           >
-            生成报告
+            {t('reports.generate')}
           </button>
 
           {/* 最新一次评测的报告 */}
@@ -271,27 +274,27 @@ export function Reports() {
             style={{ background: 'linear-gradient(135deg, #1664FF, #5B9CFF)' }}
             disabled={!latestTerminal || latestHasReport || reportGenerating}
             title={
-              !latestTerminal ? '暂无已完成的评测'
-                : latestHasReport ? '最新评测的报告已生成'
+              !latestTerminal ? t('reports.noFinishedRun')
+                : latestHasReport ? t('reports.latestDone')
                 : undefined
             }
             onClick={() => void generateFor(latestTerminal?.id ?? null)}
           >
             {reportGenerating && <span className="inline-block w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
-            {reportGenerating ? '生成中…' : '生成最新评测报告'}
+            {reportGenerating ? t('reports.generating') : t('reports.generateLatest')}
           </button>
         </div>
       </div>
 
-      {error != null && <ErrorState error={error} title="操作失败" className="mb-4 max-w-2xl" />}
+      {error != null && <ErrorState error={error} title={t('reports.actionFailed')} className="mb-4 max-w-2xl" />}
 
       <div className="flex gap-5 items-start">
         {/* 左：历史报告列表（整列吸顶，选中项在列表内置顶） */}
         <div className="w-72 shrink-0 sticky top-4 self-start">
-          <div className="text-[10px] uppercase tracking-widest text-[#C2C7D0] font-mono mb-2 px-1">历史报告</div>
+          <div className="text-[10px] uppercase tracking-widest text-[#C2C7D0] font-mono mb-2 px-1">{t('reports.history')}</div>
           {reports.length === 0 ? (
             <div className="rounded-xl border border-dashed border-[#E8E8EE] px-4 py-8 text-center text-xs text-[#9CA3AF]">
-              还没有报告。点右上角「生成最新评测报告」，或选择某次已完成的评测生成。
+              {t('reports.historyEmpty')}
             </div>
           ) : (
             <div className="space-y-1.5 overflow-auto max-h-[calc(100vh-11rem)] pr-1">
@@ -312,9 +315,9 @@ export function Reports() {
                     ].join(' ')}
                   >
                     <div className="flex items-start gap-2">
-                      <div className="flex-1 min-w-0 text-sm text-[#15171E] leading-snug break-words line-clamp-3">{r.runName?.trim() || '未命名 Run'}</div>
+                      <div className="flex-1 min-w-0 text-sm text-[#15171E] leading-snug break-words line-clamp-3">{r.runName?.trim() || t('reports.unnamedRun')}</div>
                       {r.avgOverall != null && (
-                        <span className="shrink-0 inline-flex items-baseline gap-0.5" title="平均综合分">
+                        <span className="shrink-0 inline-flex items-baseline gap-0.5" title={t('reports.avgOverall')}>
                           <span className="text-sm font-bold font-mono" style={{ color: avgColor(r.avgOverall) }}>{r.avgOverall.toFixed(1)}</span>
                           <span className="text-[9px] text-[#C2C7D0]">/10</span>
                         </span>
@@ -323,13 +326,13 @@ export function Reports() {
                     <div className="flex items-center flex-wrap gap-1.5 mt-1">
                       {r.targetLabel && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#1664FF]/10 text-[#1664FF] shrink-0 max-w-full truncate">{r.targetLabel}</span>}
                       <UserTag name={r.createdByName} />
-                      <span className="text-[10px] text-[#9CA3AF] font-mono shrink-0">{fmtDate(r.createdAt)}</span>
+                      <span className="text-[10px] text-[#9CA3AF] font-mono shrink-0">{fmtDate(r.createdAt, locale)}</span>
                       {/* 删除：仅管理员可见；悬停浮现，避免误触 */}
                       {isAdmin && (
                         <button
                           type="button"
-                          title="删除报告"
-                          aria-label="删除报告"
+                          title={t('reports.delete')}
+                          aria-label={t('reports.delete')}
                           onClick={(e) => { e.stopPropagation(); setPendingDelete(r) }}
                           className="ml-auto shrink-0 p-1 rounded-md text-[#C2C7D0] opacity-0 group-hover:opacity-100 focus:opacity-100 group-focus-within:opacity-100 hover:text-[#DC2626] hover:bg-[#DC2626]/8 transition-all"
                         >
@@ -354,9 +357,9 @@ export function Reports() {
                 {/* 视图切换：图表 / Markdown */}
                 {reportData && (
                   <div className="mr-auto flex items-center gap-0.5 bg-white border border-[#ECECF2] rounded-lg p-0.5">
-                    {([['图表视图', false], ['Markdown', true]] as const).map(([label, md]) => (
+                    {([[t('reports.viewChart'), false], ['Markdown', true]] as const).map(([label, md]) => (
                       <button
-                        key={label}
+                        key={String(md)}
                         onClick={() => setShowMd(md)}
                         className={`px-3 py-1 rounded-md text-xs transition-colors ${showMd === md ? 'bg-[#1664FF] text-white' : 'text-[#6B7280] hover:text-[#15171E]'}`}
                       >
@@ -369,13 +372,13 @@ export function Reports() {
                   className="px-3 py-1.5 rounded-lg text-xs border border-[#E8E8EE] bg-white text-[#6B7280] hover:text-[#15171E] transition-colors"
                   onClick={() => download('md')}
                 >
-                  下载 Markdown
+                  {t('reports.downloadMd')}
                 </button>
                 <button
                   className="px-3 py-1.5 rounded-lg text-xs border border-[#E8E8EE] bg-white text-[#6B7280] hover:text-[#15171E] transition-colors"
                   onClick={() => download('html')}
                 >
-                  下载 HTML
+                  {t('reports.downloadHtml')}
                 </button>
               </div>
               {reportData && !showMd ? (
@@ -389,8 +392,8 @@ export function Reports() {
           ) : (
             <div className="mt-10 flex justify-center text-center text-sm text-[#9CA3AF]">
               {reports.length === 0
-                ? '生成报告后将在这里展示'
-                : '从左侧选择一份历史报告查看'}
+                ? t('reports.placeholderEmpty')
+                : t('reports.placeholderSelect')}
             </div>
           )}
         </div>
@@ -399,15 +402,15 @@ export function Reports() {
       {/* 删除报告确认（仅管理员入口可触达） */}
       <ConfirmDialog
         open={pendingDelete !== null}
-        title="删除这份评测报告？"
+        title={t('reports.deleteTitle')}
         message={pendingDelete ? (
           <>
-            确定删除「{pendingDelete.runName?.trim() || '未命名 Run'}」的评测报告？
+            {t('reports.deleteMessage', { name: pendingDelete.runName?.trim() || t('reports.unnamedRun') })}
             <br />
-            <span className="text-xs text-[#9CA3AF]">仅删除报告本身，评测对话与评分数据保留；删除后该评测可重新生成报告。此操作不可撤销。</span>
+            <span className="text-xs text-[#9CA3AF]">{t('reports.deleteNote')}</span>
           </>
         ) : null}
-        confirmText="删除"
+        confirmText={t('reports.deleteConfirm')}
         danger
         loading={deleting}
         onConfirm={() => void confirmDeleteReport()}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bestTurns, buildReportMarkdown, clusterSuggestions, dimMeansOf, distributionOf, generateReport, stratifiedWorst, turnLabel, worstTurns } from './report-generator'
+import { bestTurns, buildReportMarkdown, clusterSuggestions, dimMeansOf, distributionOf, dimNamesFor, generateReport, stratifiedWorst, turnLabel, worstTurns } from './report-generator'
 import type { ReportInput, SynthesisResult, TurnForReport } from './report-generator'
 
 const T = (over: Partial<TurnForReport>): TurnForReport => ({
@@ -208,5 +208,65 @@ describe('generateReport', () => {
     })
     expect(markdown).toContain('总体评价')
     expect(markdown).toContain('安全与边界')
+  })
+})
+
+describe('english output', () => {
+  const CJK = /[　-〿㐀-鿿＀-￯]/
+  const enSessions = () => [{
+    id: 's1', personaName: 'Mia', repetitionIndex: 1,
+    turns: [
+      { idx: 0, userText: 'hi', targetText: 'hello', score: { overall: 3.0, comment: 'ok', improvementSuggestion: 'Add warmth', dimsJson: '{"personaFit":3}', violation: true, memoryHit: true, judgeError: null } },
+      { idx: 2, userText: 'yo', targetText: 'sup', score: { overall: 9.0, comment: 'nice', improvementSuggestion: 'Keep', dimsJson: '{"empathy":9}', violation: false, memoryHit: false, judgeError: null } },
+    ],
+  }]
+
+  it('turnLabel in English', () => {
+    expect(turnLabel(T({ idx: 2, personaName: 'Mia', repetitionIndex: 1 }), 'en')).toBe('Mia · Repetition #2 · Turn 3')
+    expect(turnLabel(T({ idx: 0 }), 'en')).toBe('Session · Turn 1')
+    expect(turnLabel(T({ idx: 2, personaName: '小明', repetitionIndex: 1 }))).toBe('小明 · 重复#2 · 第 3 轮')
+  })
+
+  it('dimNamesFor returns per-language names', () => {
+    expect(dimNamesFor('en').personaFit).toBe('Persona fit')
+    expect(dimNamesFor().personaFit).toBe('人设贴合')
+  })
+
+  it('fallback markdown is fully English (including violations and memory)', async () => {
+    const { markdown, json } = await generateReport({
+      lang: 'en', runId: 'r1', sessions: enSessions(), totalSessions: 1, avgOverall: 6.0, violations: 1, memoryHitRate: 0.5, memoryMisses: 1,
+    })
+    expect(markdown).toContain('# Evaluation report')
+    expect(markdown).toContain('## Overall assessment')
+    expect(markdown).toContain('## Score distribution (2 scored turns)')
+    expect(markdown).toContain('- Excellent (≥8): 1 turns')
+    expect(markdown).toContain('Mia · Repetition #2 · Turn 3')
+    expect(markdown).toContain('statistical fallback')
+    expect(markdown).toContain('**⚠️ Violation**')
+    expect(markdown).not.toMatch(CJK)
+    expect(JSON.parse(json).lang).toBe('en')
+  })
+
+  it('LLM failure note and suggestion skipping in English', async () => {
+    const { markdown } = await generateReport({
+      lang: 'en', runId: 'r2', sessions: enSessions(), totalSessions: 1, avgOverall: 2.0, violations: 0, memoryHitRate: null,
+      synthesizeSuggestions: async () => { throw new Error('boom') },
+    })
+    expect(markdown).toContain('LLM synthesis failed: boom')
+    expect(markdown).toContain('Add warmth')
+    expect(clusterSuggestions([T({ improvementSuggestion: 'Keep' }), T({ improvementSuggestion: 'keep as is' })])).toEqual([])
+  })
+
+  it('buildReportMarkdown English keeps only user-provided CJK', () => {
+    const md = buildReportMarkdown({ ...sampleReportInput, lang: 'en', overallAssessment: '', dimensions: [{ key: 'personaFit', name: 'Persona fit', score: 3.7, assessment: 'a|b', suggestion: '' }],
+      strengths: [], weaknesses: [], promptChanges: '', memoryIssues: '', safetyIssues: '', prioritizedActions: [],
+      worstTurns: [T({ idx: 1, personaName: '小明', userText: '你好', targetText: '嗨', comment: '偏冷', improvementSuggestion: '增加温度', dims: { empathy: 2 } })], bestTurns: [] })
+    expect(md).toContain('## Prioritized actions')
+    expect(md).toContain('(none)')
+    expect(md).toContain('(no violations)')
+    expect(md).toContain('**User:** 你好')
+    expect(md).toContain('a\\|b')
+    const stripped = md.replace(/小明|你好|嗨|偏冷|增加温度/g, '')
+    expect(stripped).not.toMatch(CJK)
   })
 })

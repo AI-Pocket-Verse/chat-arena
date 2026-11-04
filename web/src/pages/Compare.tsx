@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, type RunAggregate } from '../api'
 import { ErrorState } from '../error-state'
+import { type MessageKey, useI18n } from '../i18n'
 import { type RunRow, RunPicker } from '../run-picker'
 
 interface CompareResult {
@@ -20,13 +21,13 @@ interface CompareResponse {
 const DIM_KEYS = ['personaFit', 'empathy', 'memoryAccuracy', 'safety', 'naturalness', 'relevance'] as const
 type DimKey = typeof DIM_KEYS[number]
 
-const DIM_LABELS: Record<DimKey, string> = {
-  personaFit: '人设贴合',
-  empathy: '情感共情',
-  memoryAccuracy: '记忆准确',
-  safety: '安全合规',
-  naturalness: '自然流畅',
-  relevance: '相关性',
+const DIM_LABELS: Record<DimKey, MessageKey> = {
+  personaFit: 'compare.dim.personaFit',
+  empathy: 'compare.dim.empathy',
+  memoryAccuracy: 'compare.dim.memoryAccuracy',
+  safety: 'compare.dim.safety',
+  naturalness: 'compare.dim.naturalness',
+  relevance: 'compare.dim.relevance',
 }
 
 // SVG radar chart: pure inline, no deps
@@ -42,6 +43,7 @@ function RadarChart({
   noDataA: boolean
   noDataB: boolean
 }) {
+  const { t } = useI18n()
   const cx = 120
   const cy = 120
   const r = 90
@@ -85,7 +87,7 @@ function RadarChart({
         fontSize="9"
         fill="#6B7280"
       >
-        {DIM_LABELS[k]}
+        {t(DIM_LABELS[k])}
       </text>
     )
   })
@@ -97,7 +99,8 @@ function RadarChart({
 
   return (
     <div className="flex flex-col items-center gap-2">
-      <svg width="240" height="240" viewBox="0 0 240 240" aria-label="维度雷达图">
+      {/* 左右各留 40 宽：英文维度名（如 Memory accuracy）比中文长，留白不够会被裁掉 */}
+      <svg width="320" height="240" viewBox="-40 0 320 240" aria-label={t('compare.radar.aria')}>
         {rings}
         {axes}
         {/* Run A: muted gray */}
@@ -113,7 +116,7 @@ function RadarChart({
       </svg>
       {(noDataA || noDataB) && (
         <p className="text-[11px] text-[#9CA3AF] text-center">
-          {noDataA && noDataB ? 'Run A 和 Run B 均无有效评分数据' : noDataA ? 'Run A 无有效评分数据' : 'Run B 无有效评分数据'}
+          {noDataA && noDataB ? t('compare.radar.noDataBoth') : noDataA ? t('compare.radar.noDataA') : t('compare.radar.noDataB')}
         </p>
       )}
     </div>
@@ -121,6 +124,7 @@ function RadarChart({
 }
 
 export function Compare() {
+  const { t } = useI18n()
   const [runA, setRunA] = useState('')
   const [runB, setRunB] = useState('')
   const [result, setResult] = useState<CompareResponse | null>(null)
@@ -159,23 +163,23 @@ export function Compare() {
         background: 'radial-gradient(60rem 40rem at 90% -10%, rgba(22,100,255,0.05), transparent 60%), #ffffff',
       }}
     >
-      <h2 className="text-xl font-semibold mb-6 text-[#15171E]">A/B 回归对比</h2>
+      <h2 className="text-xl font-semibold mb-6 text-[#15171E]">{t('compare.title')}</h2>
       <div className="flex flex-col sm:flex-row gap-3 mb-6 max-w-3xl">
-        <div className="flex-1 min-w-0"><RunPicker runs={runs} value={runA} onChange={setRunA} placeholder="选择 Run A（基线）" /></div>
-        <div className="flex-1 min-w-0"><RunPicker runs={runs} value={runB} onChange={setRunB} placeholder="选择 Run B（新版）" /></div>
+        <div className="flex-1 min-w-0"><RunPicker runs={runs} value={runA} onChange={setRunA} placeholder={t('compare.pickA')} /></div>
+        <div className="flex-1 min-w-0"><RunPicker runs={runs} value={runB} onChange={setRunB} placeholder={t('compare.pickB')} /></div>
         <button
           className="px-4 py-2 rounded-xl text-sm text-white font-medium disabled:opacity-40 transition-opacity shrink-0"
           style={{ background: 'linear-gradient(135deg, #1664FF, #5B9CFF)' }}
           disabled={!runA || !runB || runA === runB}
           onClick={compare}
         >
-          对比
+          {t('compare.submit')}
         </button>
       </div>
       {runA && runB && runA === runB && (
-        <p className="text-[#D97706] text-xs mb-4 -mt-3">Run A 和 Run B 不能是同一个</p>
+        <p className="text-[#D97706] text-xs mb-4 -mt-3">{t('compare.same')}</p>
       )}
-      {error != null && <ErrorState error={error} title="对比失败" className="mb-4 max-w-2xl" />}
+      {error != null && <ErrorState error={error} title={t('compare.error')} className="mb-4 max-w-2xl" />}
       {result && (
         <div className="space-y-4 max-w-2xl">
           {/* Top deltas row */}
@@ -185,7 +189,7 @@ export function Compare() {
               className="rounded-xl border border-[#ECECF2] bg-white p-4"
               style={{ boxShadow: '0 1px 2px rgba(16,24,40,0.04), 0 1px 3px rgba(16,24,40,0.06)' }}
             >
-              <div className="text-[10px] uppercase tracking-widest text-[#9CA3AF] mb-1">综合分差</div>
+              <div className="text-[10px] uppercase tracking-widest text-[#9CA3AF] mb-1">{t('compare.overallDelta')}</div>
               <span className={`text-2xl font-mono font-bold ${result.comparison.overallDelta >= 0 ? 'text-[#059669]' : 'text-[#DC2626]'}`}>
                 {sign(result.comparison.overallDelta)}
               </span>
@@ -195,7 +199,7 @@ export function Compare() {
               className="rounded-xl border border-[#ECECF2] bg-white p-4"
               style={{ boxShadow: '0 1px 2px rgba(16,24,40,0.04), 0 1px 3px rgba(16,24,40,0.06)' }}
             >
-              <div className="text-[10px] uppercase tracking-widest text-[#9CA3AF] mb-1">违规数差</div>
+              <div className="text-[10px] uppercase tracking-widest text-[#9CA3AF] mb-1">{t('compare.violationDelta')}</div>
               <span className={`text-2xl font-mono font-bold ${result.comparison.violationDelta <= 0 ? 'text-[#059669]' : 'text-[#DC2626]'}`}>
                 {sign(result.comparison.violationDelta)}
               </span>
@@ -206,7 +210,7 @@ export function Compare() {
                 className="rounded-xl border border-[#ECECF2] bg-white p-4"
                 style={{ boxShadow: '0 1px 2px rgba(16,24,40,0.04), 0 1px 3px rgba(16,24,40,0.06)' }}
               >
-                <div className="text-[10px] uppercase tracking-widest text-[#9CA3AF] mb-1">记忆命中差</div>
+                <div className="text-[10px] uppercase tracking-widest text-[#9CA3AF] mb-1">{t('compare.memoryDelta')}</div>
                 <span className={`text-2xl font-mono font-bold ${result.comparison.memoryHitRateDelta >= 0 ? 'text-[#059669]' : 'text-[#DC2626]'}`}>
                   {sign(result.comparison.memoryHitRateDelta * 100)}%
                 </span>
@@ -218,7 +222,7 @@ export function Compare() {
                 className="rounded-xl border border-[#ECECF2] bg-white p-4"
                 style={{ boxShadow: '0 1px 2px rgba(16,24,40,0.04), 0 1px 3px rgba(16,24,40,0.06)' }}
               >
-                <div className="text-[10px] uppercase tracking-widest text-[#9CA3AF] mb-1">延迟差 (首token)</div>
+                <div className="text-[10px] uppercase tracking-widest text-[#9CA3AF] mb-1">{t('compare.latencyDelta')}</div>
                 <span className={`text-2xl font-mono font-bold ${latencyDelta <= 0 ? 'text-[#059669]' : 'text-[#DC2626]'}`}>
                   {latencyDelta > 0 ? '+' : ''}{Math.round(latencyDelta)}ms
                 </span>
@@ -233,7 +237,7 @@ export function Compare() {
               className="flex-1 rounded-xl border border-[#ECECF2] bg-white p-5 space-y-2"
               style={{ boxShadow: '0 1px 2px rgba(16,24,40,0.04), 0 1px 3px rgba(16,24,40,0.06)' }}
             >
-              <div className="text-sm font-medium text-[#15171E] mb-3">各维度差</div>
+              <div className="text-sm font-medium text-[#15171E] mb-3">{t('compare.dimDeltas')}</div>
               {DIM_KEYS.map((k) => {
                 // Bug 5: if either side has null for this dim, show — instead of a delta
                 const vA = result.runA.dimMeans[k]
@@ -243,7 +247,7 @@ export function Compare() {
                 return (
                   <div key={k} className="flex justify-between text-sm">
                     <span className={isRegression(k) ? 'text-[#DC2626]' : 'text-[#6B7280]'}>
-                      {DIM_LABELS[k]}{isRegression(k) ? ' ⚠' : ''}
+                      {t(DIM_LABELS[k])}{isRegression(k) ? ' ⚠' : ''}
                     </span>
                     {hasData && delta != null
                       ? <span className={`font-mono ${delta >= 0 ? 'text-[#059669]' : 'text-[#DC2626]'}`}>{sign(delta)}</span>
@@ -259,7 +263,7 @@ export function Compare() {
               className="rounded-xl border border-[#ECECF2] bg-white p-5 flex flex-col items-center"
               style={{ boxShadow: '0 1px 2px rgba(16,24,40,0.04), 0 1px 3px rgba(16,24,40,0.06)' }}
             >
-              <div className="text-sm font-medium text-[#15171E] mb-3 self-start">维度雷达图</div>
+              <div className="text-sm font-medium text-[#15171E] mb-3 self-start">{t('compare.radarTitle')}</div>
               <RadarChart
                 dataA={result.runA.dimMeans}
                 dataB={result.runB.dimMeans}

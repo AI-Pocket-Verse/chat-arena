@@ -4,7 +4,9 @@
 
 角色陪聊类（AI 陪伴 / 角色扮演）对话后端的自动化评测：用大模型扮演各种用户（「人设」），和被测后端连续多轮对话，裁判模型逐轮打分，最后汇总成看板和优化报告。改了 prompt 或换了模型后跑一遍，就能看出变好还是变差。
 
-![实时评测：多个会话并发进行，回复流式显示，每轮出分](docs/images/observe.png)
+![演示：新建评测、实时观战、数据看板、优化报告、版本对比、人设库与语言切换](docs/images/zh/demo.gif)
+
+<sub>约 75 秒的操作演示，使用内置演示模型录制。[观看 MP4 版](docs/media/demo-zh.mp4) · [English demo](README.md)</sub>
 
 - **模拟用户**：人设定义年龄、职业、性格、说话风格、来意；可以让 AI 从一段描述生成人设、从系统提示词反推，或从文本 / Markdown 导入
 - **对抗测试**：「对抗」类人设会逐轮升级施压，试探被测 AI 的安全边界，裁判对这类会话加严安全审查并统计违规
@@ -14,37 +16,42 @@
 - **A/B 回放**：复用某次评测的用户台词重跑，只换被测版本，保证输入完全一致
 - **优化报告**：裁判模型总结优缺点和安全问题，并基于被测角色的系统提示词给出修订版，可逐行对比原文
 - **模型可切换**：模拟用户和裁判可以分别选用不同模型，支持 OpenAI、Anthropic、豆包、千问、DeepSeek、智谱 GLM、Kimi、MiniMax，以及 Ollama 等任意 OpenAI 兼容服务
+- **中英文双语**：界面默认跟随浏览器语言，可在顶栏切换；每次评测按发起人的界面语言进行，模拟用户台词、裁判点评和报告都用这种语言
 - **没有后端、没有 API Key 也能体验**：自带的示例后端扮演两个角色，内置的演示模型模拟所有模型调用（模拟用户、裁判、报告），装好就能跑完整流程；想要真实结果时再配置模型 key
 
 技术栈：Fastify + Prisma（SQLite）后端，React + Vite + Tailwind 前端，pnpm workspace 管理。
 
 ## 截图
 
+实时评测：多个会话并发进行，回复流式显示，每轮出分。图中对抗人设逐轮施压，被测角色一时失守，裁判当即标记违规。
+
+![实时评测](docs/images/zh/observe.png)
+
 新建评测：选择人设、被测角色、模拟用户模型和裁判模型，以及结束条件。
 
-![新建评测](docs/images/new-run.png)
+![新建评测](docs/images/zh/new-run.png)
 
 数据看板：单次评测的总分与各维度得分、延迟、回复长度、违规和记忆命中率。
 
-![数据看板](docs/images/dashboard.png)
+![数据看板](docs/images/zh/dashboard.png)
 
 优化报告：优点、问题、安全问题，以及系统提示词修订版和原文的逐行对比。
 
-![评测报告](docs/images/report.png)
+![评测报告](docs/images/zh/report.png)
 
 版本对比：基线评测与新评测的总分、违规、记忆、延迟差值，以及维度雷达图。
 
-![版本对比](docs/images/compare.png)
+![版本对比](docs/images/zh/compare.png)
 
 用户人设库：普通人设和对抗人设，可配置记忆考核和对抗策略。
 
-![用户人设库](docs/images/personas.png)
+![用户人设库](docs/images/zh/personas.png)
 
 AI 角色库：被测后端提供的角色，含分段人设和完整系统提示词。
 
-![AI 角色库](docs/images/roles.png)
+![AI 角色库](docs/images/zh/roles.png)
 
-截图中的人设、角色和对话均为虚构：`pnpm bootstrap` 写入的示例人设与示例后端对话，由内置演示模型代替真实模型，所以分数和报告内容由简单规则生成，并非真实裁判的结论。
+截图中的人设、角色和对话均为虚构：`pnpm bootstrap` 写入的示例人设与示例后端对话，由内置演示模型代替真实模型，所以分数和报告内容由简单规则生成，并非真实裁判的结论。演示和截图可以用 `pnpm demo-media` 重新录制（见[常用命令](#常用命令)）。
 
 ## 工作原理
 
@@ -80,7 +87,7 @@ AI 角色库：被测后端提供的角色，含分段人设和完整系统提�
 git clone https://github.com/AI-Pocket-Verse/chat-arena.git
 cd chat-arena
 pnpm install     # 安装依赖并生成 Prisma client
-pnpm bootstrap   # 复制 api/.env.example → api/.env.dev，创建本地 SQLite 数据库并写入 3 个示例人设
+pnpm bootstrap   # 复制 api/.env.example → api/.env.dev，创建本地 SQLite 数据库并写入示例人设
 ```
 
 在两个终端分别启动示例后端和应用：
@@ -90,7 +97,7 @@ pnpm mock        # 示例被测后端和演示模型（:8680）
 pnpm dev         # api（:4040）和 web（:5040）
 ```
 
-打开 <http://localhost:5040>，进入「新建评测」，勾选示例人设，模型保持「演示 · demo」，点「开始」即可在「实时评测」里观看对话。跑完后到「数据看板」看结果，在「评测报告」生成优化报告。
+打开 <http://localhost:5040>，进入「新建评测」，勾选示例人设（林小雨、小明和对抗人设「越界试探者」，另有三个英文人设），模型保持「演示 · demo」，点「开始」即可在「实时评测」里观看对话。跑完后到「数据看板」看结果，在「评测报告」生成优化报告。
 
 这次用的是**演示模型**：不需要 key、不产生费用，内容由规则生成。要真实评测时，在 `api/.env.dev` 配置一家模型，例如千问（阿里云百炼）：
 
@@ -145,7 +152,7 @@ DEFAULT_MODEL=qwen:qwen-plus
 
 ### 示例后端
 
-`pnpm mock` 启动 [`mock/server.mjs`](mock/server.mjs)：按协议实现、无第三方依赖，内置两个虚构角色。它读取 `api/.env.dev`：
+`pnpm mock` 启动 [`mock/server.mjs`](mock/server.mjs)：按协议实现、无第三方依赖，内置两个虚构角色，按请求的 `Accept-Language` 返回中文或英文版本。它读取 `api/.env.dev`：
 
 - 配好真实模型时，用该模型扮演所选角色、流式返回真实回复（按测试账号保留对话历史），延迟、记忆、安全等整条链路都和真实后端一样可测。这会产生模型费用。
 - 没有真实模型，或设置 `MOCK_MODEL=off` 时，由演示模型生成回复：会记住用户说过的事、拒绝大多数越界请求，偶尔也会「失守」，好让评测结果里出现违规样本。不产生费用。
@@ -187,6 +194,7 @@ api 用 Node 原生的 `--env-file` 加载配置：`pnpm dev` 读 `api/.env.dev`
 | `pnpm bootstrap` | 创建 `api/.env.dev`（不存在时）、本地数据库和示例人设 |
 | `pnpm dev` | 本地开发（web 通过 Vite 代理访问 api 与 WebSocket） |
 | `pnpm mock` | 启动示例被测后端，可用 `PORT`、`DEBUG_KEY`、`MOCK_MODEL` 覆盖 |
+| `pnpm demo-media [en\|zh]` | 重新录制 README 的演示（`docs/images/<语言>/demo.gif`、`docs/media/demo-<语言>.mp4`）和截图。用临时数据库和演示模型运行，不碰你的 `api/.env.dev` 和数据；需要 Google Chrome 和 `ffmpeg` |
 | `pnpm build` | 构建 api（`api/dist`）和 web（`web/dist`） |
 | `pnpm typecheck` | 全部包类型检查 |
 | `pnpm test` | 全部单元测试 |
@@ -245,7 +253,8 @@ shared/     api 与 web 共用的类型，以及模型供应商列表（provider
 mock/       示例被测后端与演示模型（无依赖的 Node 脚本）
 packages/   共用小包（登录客户端、HTTP 客户端、皮肤 token、Tailwind 预设等）
 deploy/     systemd / nginx 模板
-docs/       被测后端接口约定与截图
+docs/       被测后端接口约定、截图与演示视频
+scripts/    演示与截图录制脚本
 ```
 
 ## Credits

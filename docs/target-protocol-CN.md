@@ -9,6 +9,7 @@ chat-arena 通过三个 HTTP 接口和被测对话后端交互：铸造测试账
 - **地址**：配置的是前缀，如 `https://example.com/companion`，接口拼成 `https://example.com/companion/debug/token`。
 - **额外请求头**：`TARGET_HEADERS` 配置的 JSON 对象会加到每个请求上，用于后端要求的客户端版本头等。
 - **响应信封**：除 `/chat` 的流式响应外都返回 `{"code": 200, "msg": "ok", "data": {...}}`。业务错误（口令错、token 失效等）可以用 HTTP 200 + `code` 非 200，chat-arena 会检查 `code` 并把 `msg` 显示为错误原因。`/chat` 出错时可以直接返回 JSON 信封（`Content-Type: application/json`）代替事件流。
+- **语言**：请求带 `Accept-Language`（`zh-CN` 或 `en`）：角色列表和连接测试用当前界面语言，评测中的铸造 token 与对话请求用该次评测的语言。支持多语言的后端可以据此返回对应语言的角色资料和回复，不支持的忽略即可。`TARGET_HEADERS` 里写了 `Accept-Language` 时以它为准。
 - **鉴权**：`/debug/*` 接口用请求头 `X-Debug-Key`（即 `TARGET_DEBUG_KEY`）；`/chat` 用请求头 `Authorization`，值是 `/debug/token` 返回的 token 原文，不加 `Bearer` 前缀。
 - chat-arena 不用的字段会被忽略，后端多返回、多接收字段不会出错。
 

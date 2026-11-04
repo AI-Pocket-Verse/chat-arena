@@ -35,6 +35,8 @@ model Run {
   personaSetJson   String    @map("persona_set_json")
   userModel        String    @map("user_model")
   judgeModel       String    @map("judge_model")
+  /// 发起评测时的界面语言（zh / en）：这次评测里模拟用户、裁判点评、报告都用它
+  lang             String    @default("zh")
   endConditionJson String    @map("end_condition_json")
   concurrency      Int
   repetitions      Int
