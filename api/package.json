@@ -1,0 +1,42 @@
+{
+  "name": "@chat-arena/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file=.env.dev src/index.ts",
+    "prebuild": "prisma generate",
+    "build": "tsc",
+    "start": "node --import tsx --env-file=.env.prod dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "db:migrate": "node --env-file=.env.dev node_modules/prisma/build/index.js migrate dev",
+    "db:migrate:prod": "node --env-file=.env.prod node_modules/prisma/build/index.js migrate deploy",
+    "db:generate": "prisma generate",
+    "db:seed": "tsx --env-file=.env.dev src/seed/index.ts",
+    "postinstall": "prisma generate",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@chat-arena/api-kit": "workspace:*",
+    "@chat-arena/auth-client-api": "workspace:*",
+    "@chat-arena/db-kit": "workspace:*",
+    "@chat-arena/shared": "workspace:*",
+    "@fastify/cors": "^11.0.0",
+    "@fastify/rate-limit": "^11.0.0",
+    "@fastify/websocket": "^11.0.0",
+    "@prisma/client": "5.22.0",
+    "fastify": "5.12.8",
+    "openai": "^4.67.3",
+    "tsx": "^4.16.2",
+    "zod": "3.23.8"
+  },
+  "devDependencies": {
+    "@chat-arena/tsconfig": "workspace:*",
+    "@types/node": "^20.14.10",
+    "@types/ws": "^8.18.1",
+    "prisma": "5.22.0",
+    "typescript": "5.4.5",
+    "vitest": "2.0.5"
+  }
+}

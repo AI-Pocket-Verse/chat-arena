@@ -1,0 +1,32 @@
+{
+  "name": "chat-arena",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Automated evaluation for character-chat backends: LLM-simulated users talk to the backend under test, a judge model scores every turn, with memory probes, red-team personas, run comparison and reports",
+  "license": "MIT",
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=20.19",
+    "pnpm": ">=9"
+  },
+  "scripts": {
+    "bootstrap": "node -e \"const fs=require('fs');if(!fs.existsSync('api/.env.dev'))fs.copyFileSync('api/.env.example','api/.env.dev')\" && pnpm --filter @chat-arena/api db:migrate && pnpm --filter @chat-arena/api db:seed",
+    "dev": "pnpm --parallel --filter @chat-arena/api --filter @chat-arena/web dev",
+    "mock": "node mock/server.mjs",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\""
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "vite": ">=5.4.21 <6",
+      "esbuild": ">=0.25.0 <0.26",
+      "vitest": ">=2.1.9 <3",
+      "micromatch": ">=4.0.8"
+    }
+  }
+}

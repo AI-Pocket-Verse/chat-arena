@@ -1,0 +1,130 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Persona {
+  id                 String   @id
+  name               String
+  category           String
+  structuredJson     String   @map("structured_json")
+  systemPrompt       String   @map("system_prompt")
+  injectedFactsJson  String?  @map("injected_facts_json")
+  recallProbesJson   String?  @map("recall_probes_json")
+  redteamTacticsJson String?  @map("redteam_tactics_json")
+  tags               String?
+  // 软删除/归档：非空表示已归档——从人设库隐藏、新建评测不可选，但保留行以维持历史报告中的人设名等引用。
+  archivedAt         DateTime? @map("archived_at")
+  createdAt          DateTime @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+  @@map("persona")
+}
+
+model Run {
+  id               String    @id
+  name             String?
+  targetBaseUrl      String    @map("target_base_url")
+  targetLabel        String?   @map("target_label")
+  taGender         Int       @map("ta_gender")
+  replayFromRunId  String?   @map("replay_from_run_id")
+  personaSetJson   String    @map("persona_set_json")
+  userModel        String    @map("user_model")
+  judgeModel       String    @map("judge_model")
+  endConditionJson String    @map("end_condition_json")
+  concurrency      Int
+  repetitions      Int
+  status           String
+  summaryJson      String?   @map("summary_json")
+  createdById      String?   @map("created_by_id")
+  createdByName    String?   @map("created_by_name")
+  createdAt        DateTime  @map("created_at")
+  startedAt        DateTime? @map("started_at")
+  finishedAt       DateTime? @map("finished_at")
+  sessions         Session[]
+  @@map("run")
+}
+
+model Session {
+  id              String    @id
+  runId           String    @map("run_id")
+  personaId       String    @map("persona_id")
+  repetitionIndex Int?      @map("repetition_index")
+  targetUid         Int?      @map("target_uid")
+  targetMemoryId    Int?      @map("target_memory_id")
+  targetRoleId      Int?      @map("target_role_id")
+  targetToken       String?   @map("target_token")
+  status          String
+  endReason       String?   @map("end_reason")
+  turnCount       Int       @default(0) @map("turn_count")
+  avgScore        Float?    @map("avg_score")
+  createdAt       DateTime  @map("created_at")
+  finishedAt      DateTime? @map("finished_at")
+  run             Run       @relation(fields: [runId], references: [id])
+  turns           Turn[]
+  @@index([runId])
+  @@map("session")
+}
+
+model Turn {
+  id            String     @id
+  sessionId     String     @map("session_id")
+  idx           Int
+  userText      String     @map("user_text")
+  targetText      String     @map("target_text")
+  targetMessageId Int?       @map("target_message_id")
+  targetSessionId String?    @map("target_session_id")
+  firstTokenMs  Int?       @map("first_token_ms")
+  totalMs       Int?       @map("total_ms")
+  errorType     String?    @map("error_type")
+  replyLen      Int?       @map("reply_len")
+  rawMetaJson   String?    @map("raw_meta_json")
+  createdAt     DateTime   @map("created_at")
+  session       Session    @relation(fields: [sessionId], references: [id])
+  score         TurnScore?
+  @@index([sessionId])
+  @@map("turn")
+}
+
+model TurnScore {
+  turnId                String   @id @map("turn_id")
+  dimsJson              String   @map("dims_json")
+  overall               Float
+  comment               String
+  improvementSuggestion String   @map("improvement_suggestion")
+  violation             Boolean  @default(false)
+  memoryHit             Boolean? @map("memory_hit")
+  judgeError            String?  @map("judge_error")
+  turn                  Turn     @relation(fields: [turnId], references: [id])
+  @@map("turn_score")
+}
+
+model MemoryCheck {
+  id           String   @id
+  sessionId    String   @map("session_id")
+  factKey      String   @map("fact_key")
+  factValue    String   @map("fact_value")
+  injectTurn   Int      @map("inject_turn")
+  probeTurn    Int      @map("probe_turn")
+  injected     Boolean
+  recalled     Boolean
+  evidenceText String?  @map("evidence_text")
+  @@index([sessionId])
+  @@map("memory_check")
+}
+
+model Report {
+  id            String   @id
+  runId         String   @map("run_id")
+  markdown      String
+  json          String
+  createdById   String?  @map("created_by_id")
+  createdByName String?  @map("created_by_name")
+  createdAt     DateTime @map("created_at")
+  @@index([runId])
+  @@map("report")
+}

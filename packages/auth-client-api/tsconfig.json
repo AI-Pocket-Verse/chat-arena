@@ -1,0 +1,5 @@
+{
+  "extends": "@chat-arena/tsconfig/api.json",
+  "include": ["src"],
+  "compilerOptions": { "noEmit": true }
+}

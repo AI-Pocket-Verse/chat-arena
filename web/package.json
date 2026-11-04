@@ -1,0 +1,41 @@
+{
+  "name": "@chat-arena/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@chat-arena/auth-client-web": "workspace:*",
+    "@chat-arena/design-tokens": "workspace:*",
+    "@chat-arena/http-client": "workspace:*",
+    "@chat-arena/shared": "workspace:*",
+    "html-to-image": "1.11.13",
+    "lucide-react": "0.408.0",
+    "pinyin-pro": "^3.28.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-markdown": "^9.0.1",
+    "react-router-dom": "6.30.6",
+    "zustand": "4.5.4"
+  },
+  "devDependencies": {
+    "@chat-arena/tailwind-preset": "workspace:*",
+    "@chat-arena/tsconfig": "workspace:*",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.39",
+    "tailwindcss": "3.4.7",
+    "typescript": "5.4.5",
+    "vite": "5.3.5",
+    "vitest": "2.0.5"
+  }
+}

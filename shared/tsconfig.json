@@ -1,0 +1,8 @@
+{
+  "extends": "@chat-arena/tsconfig/base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "noEmit": true
+  },
+  "include": ["src", "../../api/src/types.ts"]
+}

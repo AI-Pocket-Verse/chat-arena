@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -2 24 24">
+  <!-- Brand mark, mirroring the App header title icon: AI bot head
+       (24×24 viewBox, #1664FF 2.2 stroke, no speech-bubble tail) on a
+       transparent background. viewBox y is shifted -2 so the glyph
+       (antenna top y=2 … head bottom y=18) sits vertically centered. -->
+  <g fill="none" stroke="#1664FF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <!-- antenna -->
+    <path d="M12 6V2H8"/>
+    <!-- head (rounded square) -->
+    <rect x="4" y="6" width="16" height="12" rx="2.5"/>
+    <!-- ears -->
+    <path d="M2 12h2"/>
+    <path d="M20 12h2"/>
+    <!-- eyes -->
+    <path d="M9 11v2"/>
+    <path d="M15 11v2"/>
+  </g>
+</svg>

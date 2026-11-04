@@ -1,0 +1,36 @@
+/* 皮肤 token（CSS 变量）供共享组件 UserMenu 使用，必须在 @tailwind 之前引入 */
+@import '@chat-arena/design-tokens/structure.css';
+@import '@chat-arena/design-tokens/skins/a.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-white text-[#15171E] font-sans;
+}
+
+/* ── Title bot icon: blinking eyes ── */
+@keyframes bot-blink {
+  0%,
+  90%,
+  100% {
+    transform: scaleY(1);
+  }
+  94%,
+  97% {
+    transform: scaleY(0.1);
+  }
+}
+.bot-eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: bot-blink 3.4s ease-in-out infinite;
+}
+
